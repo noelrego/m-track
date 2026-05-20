@@ -4,8 +4,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import type { StringValue } from 'ms';
-import { JwtAuthGuard } from '../common';
+import { JwtAuthGuard, RolesGuard } from '../common';
 import { User, UserSchema } from '../schemas/auth.schema';
+import { AuthDevController } from './auth-dev.controller';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -24,12 +25,19 @@ import { AuthService } from './auth.service';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+    ...(process.env.NODE_ENV !== 'production' ? [AuthDevController] : []),
+  ],
   providers: [
     AuthService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
   exports: [AuthService],

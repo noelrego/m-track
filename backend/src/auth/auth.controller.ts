@@ -1,21 +1,24 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiConflictResponse,
-  ApiCreatedResponse,
+  ApiCookieAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
+  clearAuthCookie,
   AuthenticatedRequest,
+  CurrentUserResponseDto,
+  getJwtTransport,
   LoginDto,
   LoginResponseDto,
   Public,
-  RegisterDto,
-  RegisterResponseDto,
-  TempResponseDto,
+  setAuthCookie,
+  shouldUseBearer,
+  shouldUseCookie,
 } from '../common';
 import { AuthService } from './auth.service';
 
@@ -25,18 +28,6 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiCreatedResponse({
-    description: 'User registered successfully.',
-    type: RegisterResponseDto,
-  })
-  @ApiConflictResponse({ description: 'Username or email already exists.' })
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
-  }
-
-  @Public()
   @Post('login')
   @ApiOperation({ summary: 'Login with username and password' })
   @ApiOkResponse({
@@ -44,22 +35,40 @@ export class AuthController {
     type: LoginResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'Invalid username or password.' })
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
+    const loginResponse = await this.authService.login(loginDto);
+
+    if (shouldUseCookie()) {
+      setAuthCookie(response, loginResponse.accessToken);
+    }
+
+    return {
+      ...loginResponse,
+      accessToken: shouldUseBearer() ? loginResponse.accessToken : undefined,
+      authTransport: getJwtTransport(),
+    };
   }
 
-  @Get('temp')
+  @Get('me')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Temporary protected route for JWT testing' })
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'Get the authenticated user from the JWT' })
   @ApiOkResponse({
-    description: 'Bearer token is valid.',
-    type: TempResponseDto,
+    description: 'Authenticated user returned successfully.',
+    type: CurrentUserResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
-  temp(@Req() request: AuthenticatedRequest) {
-    return {
-      message: 'JWT is valid',
-      user: request.user,
-    };
+  me(@Req() request: AuthenticatedRequest) {
+    return { user: request.user };
+  }
+
+  @Public()
+  @Post('logout')
+  @ApiOperation({ summary: 'Clear the auth cookie when cookie auth is enabled' })
+  @ApiOkResponse({ description: 'Logout completed.' })
+  logout(@Res({ passthrough: true }) response: Response) {
+    clearAuthCookie(response);
+
+    return { message: 'Logged out' };
   }
 }

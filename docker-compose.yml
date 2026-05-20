@@ -32,6 +32,7 @@ services:
     image: mongo:7
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-UTC}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-m_track}
     ports:
       - "${MONGO_PORT:-27017}:27017"
@@ -42,6 +43,7 @@ services:
     image: mongo-express:1.0.2-20
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-UTC}
       ME_CONFIG_MONGODB_SERVER: mongo
       ME_CONFIG_MONGODB_PORT: 27017
       ME_CONFIG_BASICAUTH: "false"

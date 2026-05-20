@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/auth.decorator';
+import { getAuthCookieName, getJwtTransport } from '../auth-token.config';
 import type {
   AuthenticatedRequest,
   JwtPayload,
@@ -47,18 +48,26 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
+    const transport = getJwtTransport();
     const authorization = request.headers.authorization;
 
-    if (!authorization) {
-      return undefined;
+    if ((transport === 'bearer' || transport === 'both') && authorization) {
+      const [type, token] = authorization.split(' ');
+
+      if (type?.toLowerCase() === 'bearer' && token) {
+        return token;
+      }
     }
 
-    const [type, token] = authorization.split(' ');
+    if (transport === 'cookie' || transport === 'both') {
+      const cookies = request.cookies as Record<string, string | undefined> | undefined;
+      const token = cookies?.[getAuthCookieName()];
 
-    if (type?.toLowerCase() !== 'bearer' || !token) {
-      return undefined;
+      if (token) {
+        return token;
+      }
     }
 
-    return token;
+    return undefined;
   }
 }

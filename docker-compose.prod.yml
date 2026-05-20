@@ -6,6 +6,8 @@ services:
       target: production
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_API_PREFIX: ${VITE_API_PREFIX:-api}
+        VITE_AUTH_TRANSPORT: ${VITE_AUTH_TRANSPORT:-cookie}
     ports:
       - "${FRONTEND_PROD_PORT:-8080}:80"
     depends_on:
@@ -30,6 +32,7 @@ services:
     image: mongo:7
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-UTC}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-m_track}
     ports:
       - "${MONGO_PORT:-27017}:27017"
