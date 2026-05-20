@@ -172,7 +172,7 @@ function HomePage() {
   return (
     <section className="space-y-8">
       <div className="grid gap-7 xl:grid-cols-[1.35fr_0.85fr]">
-        <div>
+        <div className="order-2 xl:order-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase text-[#f36f4e]">
@@ -203,7 +203,7 @@ function HomePage() {
             </div>
           ) : null}
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch">
             {isLoading && !insights.length
               ? [0, 1, 2].map((item) => <InsightSkeleton key={item} />)
               : insights.map((insight, index) => (
@@ -217,7 +217,7 @@ function HomePage() {
         </div>
 
         <motion.div
-          className="relative overflow-hidden rounded-lg border border-[#eadfd5] bg-[#f7efe8] p-6 shadow-xl shadow-[#dfb49f]/15"
+          className="order-1 relative overflow-hidden rounded-lg border border-[#eadfd5] bg-[#f7efe8] p-6 shadow-xl shadow-[#dfb49f]/15 xl:order-2"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut' }}
@@ -364,17 +364,22 @@ function InsightCard({
   insight: ReportInsight;
 }) {
   return (
-    <div className="border-t border-zinc-200 pt-4">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm text-zinc-500">{insight.label}</p>
-          <p className="mt-3 text-2xl font-bold text-zinc-950">
-            {formatInr(insight.totalPaise)}
+    <div className="min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/20">
+      <div className="flex min-h-[6.25rem] flex-col justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <p
+            className="min-w-0 truncate whitespace-nowrap text-[11px] font-semibold leading-5 text-zinc-500 2xl:text-xs"
+            title={insight.label}
+          >
+            {insight.label}
           </p>
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[#66bfb6] text-white shadow-md shadow-[#66bfb6]/25">
+            <Icon size={13} />
+          </span>
         </div>
-        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#66bfb6] text-white">
-          <Icon size={13} />
-        </span>
+        <p className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,1.2vw,1.35rem)] font-extrabold leading-none tracking-tight text-zinc-950">
+          {formatInr(insight.totalPaise)}
+        </p>
       </div>
     </div>
   );
@@ -419,9 +424,11 @@ function getCategoryCards(data: CurrentMonthCategoryCardsResponse | null) {
 
 function InsightSkeleton() {
   return (
-    <div className="border-t border-zinc-200 pt-4">
-      <div className="h-4 w-28 animate-pulse rounded-full bg-zinc-200" />
-      <div className="mt-4 h-8 w-32 animate-pulse rounded-full bg-zinc-200" />
+    <div className="min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/15">
+      <div className="flex min-h-[6.25rem] flex-col justify-between">
+        <div className="h-4 w-28 animate-pulse rounded-full bg-zinc-200" />
+        <div className="h-6 w-32 animate-pulse rounded-full bg-zinc-200" />
+      </div>
     </div>
   );
 }

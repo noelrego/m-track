@@ -6,6 +6,7 @@ import { PublicOnlyRoute } from './routing/PublicOnlyRoute';
 import { RoleRoute } from './routing/RoleRoute';
 
 const AppShell = lazy(() => import('./layout/AppShell'));
+const AboutPage = lazy(() => import('../public/about/AboutPage'));
 const LoginPage = lazy(() => import('../public/login/LoginPage'));
 const HomePage = lazy(() => import('./home/HomePage'));
 const TagsPage = lazy(() => import('./tags/TagsPage'));
@@ -26,6 +27,7 @@ export function AppRoutes() {
               </PublicOnlyRoute>
             }
           />
+          <Route path="/about" element={<AboutPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route index element={<Navigate to="/home" replace />} />

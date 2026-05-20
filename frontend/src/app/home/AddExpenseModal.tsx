@@ -58,6 +58,7 @@ export function AddExpenseModal({
   const [tags, setTags] = useState<TagOption[]>([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -87,6 +88,15 @@ export function AddExpenseModal({
       .filter((tag) => (search ? tag.name.toLowerCase().includes(search) : true))
       .slice(0, 8);
   }, [selectedTagIds, tagSearch, tags]);
+  const canCreateTag = useMemo(() => {
+    const search = tagSearch.trim().toLowerCase();
+
+    if (!search || visibleTags.length) {
+      return false;
+    }
+
+    return !tags.some((tag) => tag.name.toLowerCase() === search);
+  }, [tagSearch, tags, visibleTags.length]);
 
   async function loadOptions(signal?: AbortSignal) {
     setIsLoadingOptions(true);
@@ -208,6 +218,40 @@ export function AddExpenseModal({
     }
   }
 
+  async function handleCreateTag() {
+    const name = tagSearch.trim();
+
+    if (!name || isCreatingTag) {
+      return;
+    }
+
+    setIsCreatingTag(true);
+    setError('');
+
+    try {
+      const response = await apiFetch('/tags', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+      const data = await readApiBody(response);
+
+      if (!response.ok) {
+        setError(getApiErrorMessage(data, 'Unable to create tag.'));
+        return;
+      }
+
+      const createdTag = data as TagOption;
+
+      setTags((currentTags) => [createdTag, ...currentTags]);
+      setSelectedTagIds((currentIds) => [...currentIds, createdTag.id]);
+      setTagSearch('');
+    } catch {
+      setError('Unable to reach the API. Please try again.');
+    } finally {
+      setIsCreatingTag(false);
+    }
+  }
+
   return (
     <Modal
       description="Add the spend before it gets fuzzy."
@@ -215,12 +259,12 @@ export function AddExpenseModal({
       onClose={closeModal}
       title="Add expense"
     >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
+      <form className="space-y-3.5" onSubmit={handleSubmit}>
+        <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]">
           <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Date</span>
-            <span className="mt-2 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
-              <CalendarDays size={16} className="text-zinc-400" />
+            <span className="text-xs font-semibold text-zinc-800">Date</span>
+            <span className="mt-1.5 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
+              <CalendarDays size={14} className="text-zinc-400" />
               <input
                 className="min-w-0 flex-1 bg-transparent outline-none"
                 onChange={(event) => setDate(event.target.value)}
@@ -232,9 +276,9 @@ export function AddExpenseModal({
           </label>
 
           <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Expense</span>
+            <span className="text-xs font-semibold text-zinc-800">Expense</span>
             <input
-              className="mt-2 w-full rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
+              className="mt-1.5 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
               inputMode="decimal"
               onChange={(event) => setAmount(event.target.value)}
               placeholder="200.96"
@@ -246,23 +290,23 @@ export function AddExpenseModal({
 
         <div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold text-zinc-800">Category</span>
+            <span className="text-xs font-semibold text-zinc-800">Category</span>
             {isLoadingOptions ? (
-              <span className="inline-flex items-center gap-2 text-xs text-zinc-500">
-                <Loader2 className="animate-spin" size={13} />
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500">
+                <Loader2 className="animate-spin" size={12} />
                 Loading
               </span>
             ) : null}
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {categories.map((category) => {
               const isSelected = selectedCategoryId === category.id;
 
               return (
                 <button
                   className={[
-                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none transition',
+                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold leading-none transition',
                     isSelected
                       ? 'border-[#f36f4e] bg-[#f36f4e] text-white shadow-md shadow-[#f36f4e]/20'
                       : 'border-[#eadfd5] bg-white text-zinc-600 hover:border-[#f36f4e]/40 hover:text-[#f36f4e]',
@@ -271,7 +315,7 @@ export function AddExpenseModal({
                   onClick={() => setSelectedCategoryId(category.id)}
                   type="button"
                 >
-                  {isSelected ? <Check size={11} /> : null}
+                  {isSelected ? <Check size={10} /> : null}
                   {category.name}
                 </button>
               );
@@ -281,9 +325,9 @@ export function AddExpenseModal({
 
         <div>
           <label className="block">
-            <span className="text-sm font-semibold text-zinc-800">Tags</span>
-            <span className="mt-2 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
-              <Search size={16} className="text-zinc-400" />
+            <span className="text-xs font-semibold text-zinc-800">Tags</span>
+            <span className="mt-1.5 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
+              <Search size={14} className="text-zinc-400" />
               <input
                 className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-zinc-400"
                 onChange={(event) => setTagSearch(event.target.value)}
@@ -296,30 +340,30 @@ export function AddExpenseModal({
           <AnimatePresence>
             {selectedTags.length ? (
               <motion.div
-                className="mt-3 flex flex-wrap gap-2"
+                className="mt-2 flex flex-wrap gap-1.5"
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
               >
                 {selectedTags.map((tag) => (
                   <button
-                    className="inline-flex items-center gap-1 rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-bold leading-none text-white"
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-950 px-2 py-0.5 text-[10px] font-bold leading-none text-white"
                     key={tag.id}
                     onClick={() => toggleTag(tag.id)}
                     type="button"
                   >
                     {tag.name}
-                    <X size={10} />
+                    <X size={9} />
                   </button>
                 ))}
               </motion.div>
             ) : null}
           </AnimatePresence>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {visibleTags.map((tag) => (
               <button
-                className="rounded-full border border-[#eadfd5] bg-white px-2.5 py-1 text-[11px] font-semibold leading-none text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+                className="rounded-full border border-[#eadfd5] bg-white px-2 py-0.5 text-[10px] font-semibold leading-none text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
                 key={tag.id}
                 onClick={() => toggleTag(tag.id)}
                 type="button"
@@ -327,13 +371,28 @@ export function AddExpenseModal({
                 {tag.name}
               </button>
             ))}
+            {canCreateTag ? (
+              <button
+                className="inline-flex items-center gap-1 rounded-full border border-[#f36f4e]/30 bg-[#fff0eb] px-2 py-0.5 text-[10px] font-bold leading-none text-[#f36f4e] transition hover:border-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isCreatingTag}
+                onClick={handleCreateTag}
+                type="button"
+              >
+                {isCreatingTag ? (
+                  <Loader2 className="animate-spin" size={10} />
+                ) : (
+                  <Plus size={10} />
+                )}
+                Create “{tagSearch.trim()}”
+              </button>
+            ) : null}
           </div>
         </div>
 
         <label className="block">
-          <span className="text-sm font-semibold text-zinc-800">Note</span>
+          <span className="text-xs font-semibold text-zinc-800">Note</span>
           <textarea
-            className="mt-2 min-h-24 w-full resize-none rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
+            className="mt-1.5 min-h-16 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
             maxLength={500}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Lunch, cab, quick detail..."
@@ -342,14 +401,14 @@ export function AddExpenseModal({
         </label>
 
         {error ? (
-          <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
             {error}
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-2 pt-1">
           <button
-            className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSaving}
             onClick={closeModal}
             type="button"
@@ -357,11 +416,11 @@ export function AddExpenseModal({
             Cancel
           </button>
           <button
-            className="inline-flex items-center gap-2 rounded-md bg-[#f36f4e] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSaving || isLoadingOptions}
             type="submit"
           >
-            {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+            {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
             Add expense
           </button>
         </div>

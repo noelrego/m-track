@@ -39,22 +39,22 @@ function AppShell() {
   }
 
   return (
-    <main className="min-h-screen bg-[#e7a083] p-3 text-zinc-950 sm:p-5 lg:p-8">
-      <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1480px] overflow-hidden rounded-[30px] bg-[#fbfaf7] shadow-2xl shadow-[#a96049]/25 sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-4rem)]">
+    <main className="h-dvh overflow-hidden bg-[#e7a083] p-3 text-zinc-950 sm:p-5 lg:p-8">
+      <div className="mx-auto flex h-[calc(100dvh-1.5rem)] w-full max-w-[1480px] overflow-hidden rounded-[30px] bg-[#fbfaf7] shadow-2xl shadow-[#a96049]/25 sm:h-[calc(100dvh-2.5rem)] lg:h-[calc(100dvh-4rem)]">
         <DesktopSidebar
           isLoggingOut={isLoggingOut}
           user={user}
           onLogout={handleLogout}
         />
 
-        <section className="flex min-w-0 flex-1 flex-col bg-[#fbfaf7]">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfaf7]">
           <MobileTopBar
             isLoggingOut={isLoggingOut}
             user={user}
             onLogout={handleLogout}
           />
 
-          <div className="flex-1 px-5 py-7 sm:px-8 lg:px-16 lg:py-14 xl:px-20">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-7 sm:px-8 lg:px-16 lg:py-14 xl:px-20">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
