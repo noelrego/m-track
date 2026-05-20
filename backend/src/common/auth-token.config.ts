@@ -13,23 +13,23 @@ export interface AuthCookieOptions {
 export function getJwtTransport(): JwtTransport {
   const transport = process.env.JWT_TRANSPORT;
 
-  if (transport === 'bearer' || transport === 'cookie' || transport === 'both') {
+  if (transport === 'bearer' || transport === 'cookie') {
     return transport;
   }
 
-  return 'bearer';
+  return 'cookie';
 }
 
 export function shouldUseBearer(): boolean {
   const transport = getJwtTransport();
 
-  return transport === 'bearer' || transport === 'both';
+  return transport === 'bearer';
 }
 
 export function shouldUseCookie(): boolean {
   const transport = getJwtTransport();
 
-  return transport === 'cookie' || transport === 'both';
+  return transport === 'cookie';
 }
 
 export function getAuthCookieName(): string {

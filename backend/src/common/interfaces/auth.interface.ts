@@ -15,4 +15,4 @@ export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
 
-export type JwtTransport = 'bearer' | 'cookie' | 'both';
+export type JwtTransport = 'bearer' | 'cookie';

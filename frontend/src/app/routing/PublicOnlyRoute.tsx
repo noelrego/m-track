@@ -1,13 +1,56 @@
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { hasAuthSession } from '../../shared/auth/auth-session';
+import type { CurrentUserResponse } from '../../common';
+import { apiFetch } from '../../shared/api/api-client';
+import { useAuthStore } from '../store/auth.store';
+import { AuthRouteLoader } from './AuthRouteLoader';
 
 interface PublicOnlyRouteProps {
   children: ReactNode;
 }
 
 export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
-  if (hasAuthSession()) {
+  const clearUser = useAuthStore((state) => state.clearUser);
+  const setUser = useAuthStore((state) => state.setUser);
+  const [status, setStatus] = useState<'checking' | 'authenticated' | 'guest'>(
+    'checking',
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    apiFetch('/me')
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Session check failed');
+        }
+
+        const data = (await response.json()) as CurrentUserResponse;
+
+        if (isMounted) {
+          setUser(data.user);
+          setStatus('authenticated');
+        }
+      })
+      .catch(() => {
+        clearUser();
+
+        if (isMounted) {
+          setStatus('guest');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clearUser, setUser]);
+
+  if (status === 'checking') {
+    return <AuthRouteLoader />;
+  }
+
+  if (status === 'authenticated') {
     return <Navigate to="/home" replace />;
   }
 

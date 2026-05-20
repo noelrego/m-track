@@ -2,12 +2,13 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch, getApiErrorMessage, shouldUseBearerOnClient } from '../../shared/api/api-client';
-import { markAuthSession, storeAccessToken } from '../../shared/auth/auth-session';
-import type { LoginResponse } from '../../shared/auth/auth.types';
+import { useAuthStore } from '../../app/store/auth.store';
+import type { LoginResponse } from '../../common';
+import { apiFetch, getApiErrorMessage } from '../../shared/api/api-client';
 
 function LoginPage() {
   const navigate = useNavigate();
+  const setUser = useAuthStore((state) => state.setUser);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,11 +31,12 @@ function LoginPage() {
         return;
       }
 
-      if (shouldUseBearerOnClient() && 'accessToken' in data && data.accessToken) {
-        storeAccessToken(data.accessToken);
+      if (!('user' in data) || !data.user) {
+        setError('Login succeeded, but user details were missing.');
+        return;
       }
 
-      markAuthSession();
+      setUser(data.user);
       navigate('/home', { replace: true });
     } catch {
       setError('Unable to reach the API. Please try again.');

@@ -84,23 +84,26 @@ curl -X POST http://localhost:3000/api/login \
 
 Auth transport is configurable:
 
-- `JWT_TRANSPORT=bearer`: return the JWT in the login response only.
-- `JWT_TRANSPORT=cookie`: set the JWT as an HttpOnly cookie only.
-- `JWT_TRANSPORT=both`: support both frontend styles during development or migration.
+- `JWT_TRANSPORT=cookie`: set the JWT as an HttpOnly cookie and return user profile data.
+- `JWT_TRANSPORT=bearer`: return user profile data plus a `token` field.
+
+The React app uses cookie auth and does not store JWTs in browser storage. It
+stores the non-sensitive login profile in Zustand persisted local storage under
+`m_track_auth_user`.
 
 For cookie auth, the backend reads `JWT_COOKIE_NAME`, `JWT_COOKIE_MAX_AGE_MS`,
 `JWT_COOKIE_SECURE`, `JWT_COOKIE_SAME_SITE`, and optional `JWT_COOKIE_DOMAIN`.
-The frontend should use a matching `VITE_AUTH_TRANSPORT` value. In local
-development, `cookie` or `both` works with `JWT_COOKIE_SECURE=false` and
+In local development, `cookie` works with `JWT_COOKIE_SECURE=false` and
 `JWT_COOKIE_SAME_SITE=lax`. For Vercel + Render over HTTPS, use
 `JWT_COOKIE_SECURE=true`, a strict `CORS_ORIGIN`, and usually
 `JWT_COOKIE_SAME_SITE=none` unless both apps share the same site through custom
 domains.
 
 Swagger is available at `/api/docs` only when `SWAGGER_ENABLED=true`. Protected
-routes are documented with both Bearer and cookie auth. In cookie mode, logging
-in from Swagger sets the HttpOnly cookie in the browser; after that, Swagger
-requests to protected routes send the cookie automatically.
+routes are documented with Bearer and cookie security schemes so Swagger can be
+used with either `JWT_TRANSPORT` setting. In cookie mode, logging in from Swagger
+sets the HttpOnly cookie in the browser; after that, Swagger requests to
+protected routes send the cookie automatically.
 
 User onboarding is admin-only:
 
@@ -121,18 +124,63 @@ Admin user-management routes:
 
 These routes require a JWT whose payload has `role: "admin"`.
 
+Admin category routes:
+
+- `POST /api/admin/categories`
+- `GET /api/admin/categories`
+- `GET /api/admin/categories/:categoryId`
+- `PATCH /api/admin/categories/:categoryId`
+- `DELETE /api/admin/categories/:categoryId`
+
+Category delete is a soft delete. Old expenses keep their category history, while
+new expenses can only use active categories.
+
+Authenticated category selection route:
+
+- `GET /api/categories`
+
+This route is available to both admins and users so the expense form can show
+active categories.
+
+## Expense Tracking APIs
+
+Money is stored as paise integers. For example, INR `125.00` is sent and stored
+as `12500`.
+
+User-owned tag routes:
+
+- `POST /api/tags`
+- `GET /api/tags`
+- `GET /api/tags/:tagId`
+- `PATCH /api/tags/:tagId`
+- `DELETE /api/tags/:tagId`
+
+Deleting a tag removes that tag from old expenses owned by the same user.
+
+User-owned expense routes:
+
+- `POST /api/expenses`
+- `GET /api/expenses/recent?month=2026-05&limit=10`
+- `GET /api/expenses/monthly-summary?month=2026-05`
+- `GET /api/expenses/:expenseId`
+- `PATCH /api/expenses/:expenseId`
+- `DELETE /api/expenses/:expenseId`
+
+Expense dates use `YYYY-MM-DD`, and reports use calendar month boundaries:
+day `1` through the last day of that month in UTC.
+
 Check the current session:
 
 ```bash
 curl http://localhost:3000/api/me \
-  -H "Authorization: Bearer <accessToken>"
+  -H "Authorization: Bearer <token>"
 ```
 
 Use the returned token on protected routes:
 
 ```bash
 curl http://localhost:3000/api/temp \
-  -H "Authorization: Bearer <accessToken>"
+  -H "Authorization: Bearer <token>"
 ```
 
 `/api/temp` is mounted only when `NODE_ENV` is not `production`.

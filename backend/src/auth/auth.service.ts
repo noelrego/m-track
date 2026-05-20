@@ -5,7 +5,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { compare, hash } from 'bcryptjs';
 import { Model } from 'mongoose';
 import { AppLogger } from '../common';
-import type { JwtPayload, LoginDto } from '../common';
+import type { JwtPayload, LoginDto, LoginResponseDto, LoginUserDto } from '../common';
 import { User, UserDocument, UserRole, UserStatus } from '../schemas/auth.schema';
 
 interface RootAdminSeedResult {
@@ -22,18 +22,14 @@ interface RootAdminSeedResult {
 
 @Injectable()
 export class AuthService {
-  private readonly jwtExpiresIn: string;
-
   constructor(
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly logger: AppLogger,
-  ) {
-    this.jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '1h');
-  }
+  ) {}
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto): Promise<LoginResponseDto & { token: string }> {
     let user: UserDocument | null;
 
     try {
@@ -64,11 +60,30 @@ export class AuthService {
     };
 
     return {
-      accessToken: await this.jwtService.signAsync(payload),
-      tokenType: 'Bearer',
-      expiresIn: this.jwtExpiresIn,
-      authTransport: 'bearer',
+      user: this.toLoginUser(user),
+      token: await this.jwtService.signAsync(payload),
     };
+  }
+
+  async getCurrentUser(userId: string): Promise<LoginUserDto> {
+    try {
+      const user = await this.userModel
+        .findOne({ _id: userId, status: UserStatus.Active })
+        .exec();
+
+      if (!user) {
+        throw new UnauthorizedException('Invalid session');
+      }
+
+      return this.toLoginUser(user);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      this.logger.error(error, 'Current user lookup failed', { userId });
+      throw error;
+    }
   }
 
   async seedRootAdminFromEnv(): Promise<RootAdminSeedResult> {
@@ -170,6 +185,17 @@ export class AuthService {
       role: user.role,
       isRootAdmin: user.isRootAdmin,
       status: user.status,
+    };
+  }
+
+  private toLoginUser(user: UserDocument): LoginUserDto {
+    return {
+      username: user.username,
+      emailId: user.emailId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isRootAdmin: user.isRootAdmin,
     };
   }
 

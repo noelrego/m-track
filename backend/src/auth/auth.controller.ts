@@ -12,7 +12,6 @@ import {
   clearAuthCookie,
   AuthenticatedRequest,
   CurrentUserResponseDto,
-  getJwtTransport,
   LoginDto,
   LoginResponseDto,
   Public,
@@ -39,13 +38,12 @@ export class AuthController {
     const loginResponse = await this.authService.login(loginDto);
 
     if (shouldUseCookie()) {
-      setAuthCookie(response, loginResponse.accessToken);
+      setAuthCookie(response, loginResponse.token);
     }
 
     return {
-      ...loginResponse,
-      accessToken: shouldUseBearer() ? loginResponse.accessToken : undefined,
-      authTransport: getJwtTransport(),
+      user: loginResponse.user,
+      token: shouldUseBearer() ? loginResponse.token : undefined,
     };
   }
 
@@ -58,8 +56,8 @@ export class AuthController {
     type: CurrentUserResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
-  me(@Req() request: AuthenticatedRequest) {
-    return { user: request.user };
+  async me(@Req() request: AuthenticatedRequest) {
+    return { user: await this.authService.getCurrentUser(request.user!.sub) };
   }
 
   @Public()

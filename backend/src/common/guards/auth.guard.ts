@@ -51,7 +51,7 @@ export class JwtAuthGuard implements CanActivate {
     const transport = getJwtTransport();
     const authorization = request.headers.authorization;
 
-    if ((transport === 'bearer' || transport === 'both') && authorization) {
+    if (transport === 'bearer' && authorization) {
       const [type, token] = authorization.split(' ');
 
       if (type?.toLowerCase() === 'bearer' && token) {
@@ -59,7 +59,7 @@ export class JwtAuthGuard implements CanActivate {
       }
     }
 
-    if (transport === 'cookie' || transport === 'both') {
+    if (transport === 'cookie') {
       const cookies = request.cookies as Record<string, string | undefined> | undefined;
       const token = cookies?.[getAuthCookieName()];
 

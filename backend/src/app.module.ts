@@ -5,7 +5,10 @@ import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { CategoriesModule } from './categories/categories.module';
 import { LoggerModule } from './common';
+import { ExpenseModule } from './expense/expense.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -22,6 +25,9 @@ import { LoggerModule } from './common';
     }),
     AuthModule,
     AdminModule,
+    CategoriesModule,
+    TagsModule,
+    ExpenseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

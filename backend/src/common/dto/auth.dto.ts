@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Length, Matches } from 'class-validator';
+import { UserRole } from '../../schemas/auth.schema';
 
 const usernamePattern = /^[A-Za-z0-9_.-]+$/;
 
@@ -30,39 +31,47 @@ export class LoginDto {
   password: string;
 }
 
+export class LoginUserDto {
+  @ApiProperty({ example: 'admin' })
+  username: string;
+
+  @ApiProperty({ example: 'admin@example.com' })
+  emailId: string;
+
+  @ApiProperty({ example: 'Admin' })
+  firstName: string;
+
+  @ApiProperty({ example: 'User', required: false })
+  lastName?: string;
+
+  @ApiProperty({ enum: UserRole, example: UserRole.User })
+  role: UserRole;
+
+  @ApiProperty({ example: false })
+  isRootAdmin: boolean;
+}
+
 export class LoginResponseDto {
   @ApiProperty({
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    description: 'JWT access token.',
-    required: false,
+    type: () => LoginUserDto,
+    description: 'Logged in user profile data safe to store on the frontend.',
   })
-  accessToken?: string;
-
-  @ApiProperty({ example: 'Bearer' })
-  tokenType: string;
-
-  @ApiProperty({ example: '1h' })
-  expiresIn: string;
+  user: LoginUserDto;
 
   @ApiProperty({
-    example: 'both',
-    enum: ['bearer', 'cookie', 'both'],
-    description: 'How the API delivered the JWT for this login response.',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'JWT token. Present only when JWT_TRANSPORT=bearer.',
+    required: false,
   })
-  authTransport: string;
+  token?: string;
 }
 
 export class CurrentUserResponseDto {
   @ApiProperty({
-    example: {
-      sub: '665d2fb4d5f6a0a42f1f9a21',
-      username: 'admin',
-      emailId: 'admin@example.com',
-      role: 'admin',
-      isRootAdmin: true,
-    },
+    type: () => LoginUserDto,
+    description: 'Current authenticated user profile.',
   })
-  user: Record<string, unknown>;
+  user: LoginUserDto;
 }
 
 export class TempResponseDto {
