@@ -6,11 +6,16 @@ import { getDisplayName, getInitials } from '../users/user-display';
 import { NAVIGATION_ITEMS } from './navigation.config';
 
 interface DesktopSidebarProps {
+  isLoggingOut: boolean;
   onLogout: () => void;
   user: LoginUser | null;
 }
 
-export function DesktopSidebar({ onLogout, user }: DesktopSidebarProps) {
+export function DesktopSidebar({
+  isLoggingOut,
+  onLogout,
+  user,
+}: DesktopSidebarProps) {
   const displayName = getDisplayName(user);
   const items = NAVIGATION_ITEMS.filter((item) =>
     user ? item.roles.includes(user.role) : false,
@@ -64,14 +69,15 @@ export function DesktopSidebar({ onLogout, user }: DesktopSidebarProps) {
       </nav>
 
       <button
-        className="mt-10 flex w-fit items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-white hover:text-zinc-950"
+        className="mt-10 flex w-fit items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-white hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={isLoggingOut}
         onClick={onLogout}
         type="button"
       >
         <span className="grid size-8 place-items-center rounded-full bg-zinc-950 text-white">
           <LogOut size={15} />
         </span>
-        Log out
+        {isLoggingOut ? 'Logging out...' : 'Log out'}
       </button>
     </aside>
   );

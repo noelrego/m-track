@@ -49,19 +49,20 @@ export class CreateAdminUserDto {
   @MaxLength(254)
   emailid: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Jane',
     minLength: 1,
     maxLength: 80,
-    description: 'First name. Letters, spaces, apostrophes, and hyphens only.',
+    description: 'Optional first name. Falls back to username when omitted.',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
   @IsString()
   @Length(1, 80)
   @Matches(textNamePattern, {
     message: 'firstName can only contain letters, spaces, apostrophes, and hyphens',
   })
-  firstName: string;
+  firstName?: string;
 
   @ApiPropertyOptional({
     example: 'User',
@@ -90,6 +91,17 @@ export class CreateAdminUserDto {
 export class UpdateAdminUserDto extends PartialType(
   OmitType(CreateAdminUserDto, ['password'] as const),
 ) {
+  @ApiPropertyOptional({
+    example: 'newstrongpass123',
+    minLength: 8,
+    maxLength: 128,
+    description: 'Optional replacement password. Stored only as a salted hash.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(8, 128)
+  password?: string;
+
   @ApiPropertyOptional({
     enum: UserRole,
     example: UserRole.User,

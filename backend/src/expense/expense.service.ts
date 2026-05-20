@@ -219,6 +219,7 @@ export class ExpenseService {
         return {
           categoryId: category.id,
           categoryName: category.name,
+          normalizedName: category.normalizedName,
           totalPaise: aggregate?.totalPaise ?? 0,
           count: aggregate?.count ?? 0,
         };
@@ -365,6 +366,7 @@ export class ExpenseService {
       category: {
         id: expense.categoryId,
         name: category?.name ?? 'Unknown category',
+        normalizedName: category?.normalizedName,
       },
       tags: expense.tagIds
         .map((tagId) => relations.tags.get(tagId))

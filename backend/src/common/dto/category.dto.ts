@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { ExpenseCategoryKey } from '../enums/category.enum';
 
 const categoryNamePattern = /^[A-Za-z0-9][A-Za-z0-9 &._-]*$/;
 const safeTextPattern = /^[^<>]*$/;
@@ -20,7 +21,8 @@ export class CreateCategoryDto {
     example: 'Needs',
     minLength: 2,
     maxLength: 60,
-    description: 'Category name shown in reports and expense forms.',
+    description:
+      'Static category display name. Normalized value must be one of needs, wants, emis, extra, or invest.',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -68,6 +70,9 @@ export class CategoryResponseDto {
 
   @ApiProperty({ example: 'Needs' })
   name: string;
+
+  @ApiProperty({ enum: ExpenseCategoryKey, example: ExpenseCategoryKey.Needs })
+  normalizedName: ExpenseCategoryKey;
 
   @ApiPropertyOptional({
     example: 'Daily essentials like food, groceries, and vehicle service.',

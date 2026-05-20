@@ -9,11 +9,22 @@ interface AuthStore {
   setUser: (user: LoginUser) => void;
 }
 
+function clearPersistedAuthUser() {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.AUTH_USER);
+}
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
       user: null,
-      clearUser: () => set({ user: null }),
+      clearUser: () => {
+        set({ user: null });
+        clearPersistedAuthUser();
+      },
       setUser: (user) => set({ user }),
     }),
     {

@@ -1,10 +1,17 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import {
   AppLogger,
   CategoryResponseDto,
   CreateCategoryDto,
+  ExpenseCategoryKey,
+  isExpenseCategoryKey,
   UpdateCategoryDto,
 } from '../common';
 import {
@@ -24,9 +31,11 @@ export class AdminCategoryService {
     createdByUserId: string,
   ): Promise<CategoryResponseDto> {
     const normalizedName = this.normalizeName(createCategoryDto.name);
+    this.ensureStaticCategoryKey(normalizedName);
 
     this.logger.debug('Admin create category requested', {
       name: createCategoryDto.name,
+      normalizedName,
       createdByUserId,
     });
 
@@ -46,7 +55,7 @@ export class AdminCategoryService {
 
       return this.toCategoryResponse(category);
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof BadRequestException || error instanceof ConflictException) {
         throw error;
       }
 
@@ -93,6 +102,7 @@ export class AdminCategoryService {
     try {
       if (updateCategoryDto.name) {
         const normalizedName = this.normalizeName(updateCategoryDto.name);
+        this.ensureStaticCategoryKey(normalizedName);
         await this.ensureCategoryNameIsAvailable(normalizedName, category.id);
         category.name = updateCategoryDto.name;
         category.normalizedName = normalizedName;
@@ -115,7 +125,7 @@ export class AdminCategoryService {
 
       return this.toCategoryResponse(updatedCategory);
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof BadRequestException || error instanceof ConflictException) {
         throw error;
       }
 
@@ -170,7 +180,7 @@ export class AdminCategoryService {
   }
 
   private async ensureCategoryNameIsAvailable(
-    normalizedName: string,
+    normalizedName: ExpenseCategoryKey,
     currentCategoryId?: string,
   ): Promise<void> {
     const existingCategory = await this.categoryModel
@@ -186,10 +196,21 @@ export class AdminCategoryService {
     return name.trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
+  private ensureStaticCategoryKey(
+    normalizedName: string,
+  ): asserts normalizedName is ExpenseCategoryKey {
+    if (!isExpenseCategoryKey(normalizedName)) {
+      throw new BadRequestException(
+        'Category must be one of needs, wants, emis, extra, or invest',
+      );
+    }
+  }
+
   private toCategoryResponse(category: CategoryDocument): CategoryResponseDto {
     return {
       id: category.id,
       name: category.name,
+      normalizedName: category.normalizedName,
       description: category.description,
       isActive: category.isActive,
       sortOrder: category.sortOrder,

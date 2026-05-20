@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { ExpenseCategoryKey } from '../common/enums/category.enum';
 
 export type CategoryDocument = HydratedDocument<Category>;
 
@@ -19,13 +20,14 @@ export class Category {
   name: string;
 
   @Prop({
+    enum: ExpenseCategoryKey,
     required: true,
     lowercase: true,
     trim: true,
     unique: true,
     index: true,
   })
-  normalizedName: string;
+  normalizedName: ExpenseCategoryKey;
 
   @Prop({
     trim: true,

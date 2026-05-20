@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { ExpenseCategoryKey } from '../enums/category.enum';
 
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
 const monthKeyPattern = /^\d{4}-\d{2}$/;
@@ -105,6 +106,9 @@ export class ExpenseCategoryDto {
 
   @ApiProperty({ example: 'Needs' })
   name: string;
+
+  @ApiPropertyOptional({ enum: ExpenseCategoryKey, example: ExpenseCategoryKey.Needs })
+  normalizedName?: ExpenseCategoryKey;
 }
 
 export class ExpenseTagDto {
@@ -158,6 +162,9 @@ export class ExpenseCategorySummaryDto {
 
   @ApiProperty({ example: 'Needs' })
   categoryName: string;
+
+  @ApiProperty({ enum: ExpenseCategoryKey, example: ExpenseCategoryKey.Needs })
+  normalizedName: ExpenseCategoryKey;
 
   @ApiProperty({ example: 452500 })
   totalPaise: number;

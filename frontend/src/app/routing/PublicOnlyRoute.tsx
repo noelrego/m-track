@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import type { CurrentUserResponse } from '../../common';
 import { apiFetch } from '../../shared/api/api-client';
 import { useAuthStore } from '../store/auth.store';
@@ -11,6 +11,7 @@ interface PublicOnlyRouteProps {
 }
 
 export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
+  const location = useLocation();
   const clearUser = useAuthStore((state) => state.clearUser);
   const setUser = useAuthStore((state) => state.setUser);
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'guest'>(
@@ -19,6 +20,16 @@ export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
 
   useEffect(() => {
     let isMounted = true;
+    const routeState = location.state as { fromLogout?: boolean } | null;
+
+    if (routeState?.fromLogout) {
+      clearUser();
+      setStatus('guest');
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     apiFetch('/me')
       .then(async (response) => {
@@ -44,7 +55,7 @@ export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
     return () => {
       isMounted = false;
     };
-  }, [clearUser, setUser]);
+  }, [clearUser, location.state, setUser]);
 
   if (status === 'checking') {
     return <AuthRouteLoader />;

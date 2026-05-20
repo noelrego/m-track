@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { LoggerModule } from './common';
 import { ExpenseModule } from './expense/expense.module';
+import { ReportModule } from './report/report.module';
 import { TagsModule } from './tags/tags.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { TagsModule } from './tags/tags.module';
     CategoriesModule,
     TagsModule,
     ExpenseModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

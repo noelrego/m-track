@@ -32,6 +32,7 @@ export class CategoriesService {
     return {
       id: category.id,
       name: category.name,
+      normalizedName: category.normalizedName,
       description: category.description,
       isActive: category.isActive,
       sortOrder: category.sortOrder,

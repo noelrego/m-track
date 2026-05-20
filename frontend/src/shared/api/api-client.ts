@@ -31,6 +31,14 @@ export function getApiErrorMessage(data: unknown, fallback: string) {
   return fallback;
 }
 
+export async function readApiBody(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 function buildApiUrl(path: string) {
   const baseUrl = apiUrl.replace(/\/+$/g, '');
   const prefix = apiPrefix.replace(/^\/+|\/+$/g, '');

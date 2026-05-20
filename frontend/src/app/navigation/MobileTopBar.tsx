@@ -7,11 +7,12 @@ import { getDisplayName, getInitials } from '../users/user-display';
 import { NAVIGATION_ITEMS } from './navigation.config';
 
 interface MobileTopBarProps {
+  isLoggingOut: boolean;
   onLogout: () => void;
   user: LoginUser | null;
 }
 
-export function MobileTopBar({ onLogout, user }: MobileTopBarProps) {
+export function MobileTopBar({ isLoggingOut, onLogout, user }: MobileTopBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const displayName = getDisplayName(user);
   const items = NAVIGATION_ITEMS.filter((item) =>
@@ -111,14 +112,18 @@ export function MobileTopBar({ onLogout, user }: MobileTopBarProps) {
               </nav>
 
               <button
-                className="mt-8 flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-zinc-600 transition hover:bg-white hover:text-zinc-950"
-                onClick={onLogout}
+                className="mt-8 flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-zinc-600 transition hover:bg-white hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isLoggingOut}
+                onClick={() => {
+                  setIsOpen(false);
+                  onLogout();
+                }}
                 type="button"
               >
                 <span className="grid size-8 place-items-center rounded-full bg-zinc-950 text-white">
                   <LogOut size={15} />
                 </span>
-                Log out
+                {isLoggingOut ? 'Logging out...' : 'Log out'}
               </button>
             </motion.aside>
           </>

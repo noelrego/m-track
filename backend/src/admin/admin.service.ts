@@ -44,7 +44,7 @@ export class AdminService {
         username: createUserDto.username,
         emailId: createUserDto.emailid,
         passwordHash,
-        firstName: createUserDto.firstName,
+        firstName: createUserDto.firstName ?? createUserDto.username,
         lastName: createUserDto.lastName,
         role: createUserDto.role,
         isRootAdmin: false,
@@ -132,6 +132,10 @@ export class AdminService {
 
       if (updateUserDto.role) {
         user.role = updateUserDto.role;
+      }
+
+      if (updateUserDto.password) {
+        user.passwordHash = await hash(updateUserDto.password, 12);
       }
 
       const updatedUser = await user.save();
