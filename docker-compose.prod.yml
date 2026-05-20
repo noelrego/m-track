@@ -1,0 +1,40 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    ports:
+      - "${FRONTEND_PROD_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      target: production
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/${MONGO_INITDB_DATABASE:-m_track}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-m_track}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo_data_prod:/data/db
+
+volumes:
+  mongo_data_prod:
