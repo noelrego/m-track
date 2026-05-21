@@ -1,4 +1,3 @@
-export * from './auth-token.config';
 export * from './decorators/auth.decorator';
 export * from './dto/admin.dto';
 export * from './dto/auth.dto';

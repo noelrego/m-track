@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/
 import {
   ApiBearerAuth,
   ApiConflictResponse,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -24,7 +23,6 @@ import { AdminCategoryService } from './admin-category.service';
 
 @ApiTags('Admin Categories')
 @ApiBearerAuth()
-@ApiCookieAuth()
 @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
 @ApiForbiddenResponse({ description: 'Admin role is required.' })
 @Roles(UserRole.Admin)

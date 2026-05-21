@@ -11,7 +11,7 @@ export interface LoginUser {
 
 export interface LoginResponse {
   user: LoginUser;
-  token?: string;
+  token: string;
 }
 
 export interface CurrentUserResponse {

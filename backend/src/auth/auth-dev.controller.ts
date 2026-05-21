@@ -1,7 +1,6 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCookieAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -14,7 +13,6 @@ import { AuthenticatedRequest, TempResponseDto } from '../common';
 export class AuthDevController {
   @Get('temp')
   @ApiBearerAuth()
-  @ApiCookieAuth()
   @ApiOperation({ summary: 'Temporary protected route for JWT testing' })
   @ApiOkResponse({
     description: 'Bearer token is valid.',

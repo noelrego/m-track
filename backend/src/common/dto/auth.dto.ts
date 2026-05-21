@@ -60,10 +60,9 @@ export class LoginResponseDto {
 
   @ApiProperty({
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    description: 'JWT token. Present only when JWT_TRANSPORT=bearer.',
-    required: false,
+    description: 'JWT bearer token.',
   })
-  token?: string;
+  token: string;
 }
 
 export class CurrentUserResponseDto {

@@ -14,5 +14,3 @@ export interface JwtPayload {
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
-
-export type JwtTransport = 'bearer' | 'cookie';

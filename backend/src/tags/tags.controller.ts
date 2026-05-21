@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/
 import {
   ApiBearerAuth,
   ApiConflictResponse,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -21,7 +20,6 @@ import { TagsService } from './tags.service';
 
 @ApiTags('Tags')
 @ApiBearerAuth()
-@ApiCookieAuth()
 @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
 @Controller('tags')
 export class TagsController {

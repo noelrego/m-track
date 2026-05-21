@@ -1,7 +1,6 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCookieAuth,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -19,7 +18,6 @@ import { ReportService } from './report.service';
 
 @ApiTags('Report')
 @ApiBearerAuth()
-@ApiCookieAuth()
 @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
 @Controller('report')
 export class ReportController {

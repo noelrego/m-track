@@ -146,6 +146,6 @@ export class AppLogger implements LoggerService {
   }
 
   private isSensitiveKey(key: string): boolean {
-    return /password|token|secret|authorization|cookie/i.test(key);
+    return /password|token|secret|authorization/i.test(key);
   }
 }

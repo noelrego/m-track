@@ -1,9 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestFactory } from '@nestjs/core';
-import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { AppLogger, getAuthCookieName, shouldUseCookie } from './common';
+import { AppLogger } from './common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -17,9 +16,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: corsOrigin ? corsOrigin.split(',').map((origin) => origin.trim()) : true,
-    credentials: shouldUseCookie(),
   });
-  app.use(cookieParser());
 
   if (globalPrefix) {
     app.setGlobalPrefix(globalPrefix);
@@ -40,7 +37,6 @@ async function bootstrap() {
       .setDescription('Money tracking API documentation')
       .setVersion('0.1.0')
       .addBearerAuth()
-      .addCookieAuth(getAuthCookieName())
       .build();
     const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
     const swaggerPath = joinRoutePaths(

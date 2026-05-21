@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -24,7 +23,6 @@ import { AdminService } from './admin.service';
 
 @ApiTags('Admin Users')
 @ApiBearerAuth()
-@ApiCookieAuth()
 @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
 @ApiForbiddenResponse({ description: 'Admin role is required.' })
 @Roles(UserRole.Admin)

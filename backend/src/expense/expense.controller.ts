@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -34,7 +33,6 @@ import { ExpenseService } from './expense.service';
 
 @ApiTags('Expenses')
 @ApiBearerAuth()
-@ApiCookieAuth()
 @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
 @Controller('expenses')
 export class ExpenseController {
