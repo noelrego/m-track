@@ -40,7 +40,7 @@ export function getAuthCookieOptions(): AuthCookieOptions {
   const sameSite = resolveSameSite(process.env.JWT_COOKIE_SAME_SITE);
   const cookieOptions: AuthCookieOptions = {
     httpOnly: true,
-    secure: process.env.JWT_COOKIE_SECURE === 'true',
+    secure: resolveBoolean(process.env.JWT_COOKIE_SECURE),
     sameSite,
     maxAge: Number(process.env.JWT_COOKIE_MAX_AGE_MS ?? 3_600_000),
     path: '/',
@@ -67,9 +67,15 @@ export function clearAuthCookie(response: Response): void {
 }
 
 function resolveSameSite(value: string | undefined): AuthCookieOptions['sameSite'] {
-  if (value === 'strict' || value === 'none') {
-    return value;
+  const normalizedValue = value?.trim().toLowerCase();
+
+  if (normalizedValue === 'strict' || normalizedValue === 'none') {
+    return normalizedValue;
   }
 
   return 'lax';
+}
+
+function resolveBoolean(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === 'true';
 }
