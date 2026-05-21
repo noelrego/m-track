@@ -17,7 +17,7 @@ export function getJwtTransport(): JwtTransport {
     return transport;
   }
 
-  return 'cookie';
+  return 'bearer';
 }
 
 export function shouldUseBearer(): boolean {
