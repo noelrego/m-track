@@ -3,7 +3,6 @@ import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
-import { apiFetch } from '../../shared/api/api-client';
 import { DesktopSidebar } from '../navigation/DesktopSidebar';
 import { MobileTopBar } from '../navigation/MobileTopBar';
 
@@ -14,28 +13,17 @@ function AppShell() {
   const clearUser = useAuthStore((state) => state.clearUser);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  async function handleLogout() {
+  function handleLogout() {
     if (isLoggingOut) {
       return;
     }
 
     setIsLoggingOut(true);
     clearUser();
-
-    try {
-      await apiFetch('/logout', {
-        cache: 'no-store',
-        method: 'POST',
-      });
-    } catch {
-      // Local auth cache is still cleared so the user can return to login.
-    } finally {
-      clearUser();
-      navigate('/login', {
-        replace: true,
-        state: { fromLogout: true },
-      });
-    }
+    navigate('/login', {
+      replace: true,
+      state: { fromLogout: true },
+    });
   }
 
   return (

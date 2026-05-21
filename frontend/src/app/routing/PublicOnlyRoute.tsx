@@ -14,6 +14,7 @@ export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
   const location = useLocation();
   const clearUser = useAuthStore((state) => state.clearUser);
   const setUser = useAuthStore((state) => state.setUser);
+  const token = useAuthStore((state) => state.token);
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'guest'>(
     'checking',
   );
@@ -23,6 +24,15 @@ export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
     const routeState = location.state as { fromLogout?: boolean } | null;
 
     if (routeState?.fromLogout) {
+      clearUser();
+      setStatus('guest');
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!token) {
       clearUser();
       setStatus('guest');
 
@@ -55,7 +65,7 @@ export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
     return () => {
       isMounted = false;
     };
-  }, [clearUser, location.state, setUser]);
+  }, [clearUser, location.state, setUser, token]);
 
   if (status === 'checking') {
     return <AuthRouteLoader />;

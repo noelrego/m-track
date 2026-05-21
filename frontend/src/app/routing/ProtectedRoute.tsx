@@ -15,12 +15,22 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
   const clearUser = useAuthStore((state) => state.clearUser);
   const setUser = useAuthStore((state) => state.setUser);
+  const token = useAuthStore((state) => state.token);
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'guest'>(
     'checking',
   );
 
   useEffect(() => {
     let isMounted = true;
+
+    if (!token) {
+      clearUser();
+      setStatus('guest');
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     apiFetch('/me')
       .then(async (response) => {
@@ -46,7 +56,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return () => {
       isMounted = false;
     };
-  }, [clearUser]);
+  }, [clearUser, setUser, token]);
 
   if (status === 'checking') {
     return <AuthRouteLoader />;

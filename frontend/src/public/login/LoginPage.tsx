@@ -8,7 +8,7 @@ import { apiFetch, getApiErrorMessage } from "../../shared/api/api-client";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const setUser = useAuthStore((state) => state.setUser);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -48,7 +48,12 @@ function LoginPage() {
         return;
       }
 
-      setUser(data.user);
+      if (!data.token) {
+        setError("Login succeeded, but the API did not return a bearer token.");
+        return;
+      }
+
+      setAuth(data.user, data.token);
       navigate("/home", { replace: true });
     } catch {
       setError("Unable to reach the API. Please try again.");
@@ -125,7 +130,7 @@ function LoginPage() {
                   Welcome back
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Sign in to the user created by your admin.
+                  Sign in to record expenses and review your monthly spending.
                 </p>
               </div>
 
