@@ -12,6 +12,7 @@ import {
   CurrentMonthCategoryCardsResponseDto,
   CurrentMonthTopExpensesResponseDto,
   CurrentMonthWeeklyReportResponseDto,
+  CurrentYearMonthlyExpenseResponseDto,
   ReportInsightsResponseDto,
 } from '../common';
 import { ReportService } from './report.service';
@@ -78,5 +79,19 @@ export class ReportController {
   })
   getCurrentMonthTopExpenses(@Req() request: AuthenticatedRequest) {
     return this.reportService.getCurrentMonthTopExpenses(request.user!.sub);
+  }
+
+  @Get('current-year/monthly-expenses')
+  @ApiOperation({
+    summary: 'Get current year monthly expense totals',
+    description:
+      'Returns all 12 months for the current UTC year with total expense across every category.',
+  })
+  @ApiOkResponse({
+    description: 'Current year monthly expense totals returned successfully.',
+    type: CurrentYearMonthlyExpenseResponseDto,
+  })
+  getCurrentYearMonthlyExpenses(@Req() request: AuthenticatedRequest) {
+    return this.reportService.getCurrentYearMonthlyExpenses(request.user!.sub);
   }
 }

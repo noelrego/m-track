@@ -158,3 +158,37 @@ export class CurrentMonthTopExpensesResponseDto {
   @ApiProperty({ type: () => [TopExpenseItemDto] })
   expenses: TopExpenseItemDto[];
 }
+
+export class YearlyMonthlyExpenseItemDto {
+  @ApiProperty({ example: 1 })
+  monthNumber: number;
+
+  @ApiProperty({ example: '2026-01' })
+  monthKey: string;
+
+  @ApiProperty({ example: 'January 2026' })
+  monthName: string;
+
+  @ApiProperty({ example: 'Jan' })
+  label: string;
+
+  @ApiProperty({ example: 125000 })
+  totalPaise: number;
+
+  @ApiProperty({ example: 8 })
+  count: number;
+}
+
+export class CurrentYearMonthlyExpenseResponseDto {
+  @ApiProperty({ example: 2026 })
+  year: number;
+
+  @ApiProperty({ example: '2026-01-01' })
+  startDate: string;
+
+  @ApiProperty({ example: '2026-12-31' })
+  endDate: string;
+
+  @ApiProperty({ type: () => [YearlyMonthlyExpenseItemDto] })
+  months: YearlyMonthlyExpenseItemDto[];
+}

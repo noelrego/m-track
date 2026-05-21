@@ -6,6 +6,7 @@ import {
   CurrentMonthCategoryCardsResponseDto,
   CurrentMonthTopExpensesResponseDto,
   CurrentMonthWeeklyReportResponseDto,
+  CurrentYearMonthlyExpenseResponseDto,
   EXPENSE_CATEGORY_KEYS,
   ExpenseCategoryKey,
   ReportCategoryAmountDto,
@@ -32,6 +33,12 @@ interface CategoryAggregate {
   totalPaise: number;
 }
 
+interface MonthAggregate {
+  _id: string;
+  count: number;
+  totalPaise: number;
+}
+
 interface CategoryLookup {
   byId: Map<string, CategoryDocument>;
   byKey: Map<ExpenseCategoryKey, CategoryDocument>;
@@ -44,6 +51,14 @@ interface WeekRange {
   start: Date;
   startDate: string;
   weekNumber: number;
+}
+
+interface YearRange {
+  end: Date;
+  endDate: string;
+  start: Date;
+  startDate: string;
+  year: number;
 }
 
 const ALL_CATEGORY_KEYS = EXPENSE_CATEGORY_KEYS;
@@ -238,6 +253,59 @@ export class ReportService {
       };
     } catch (error) {
       this.logger.error(error, 'Report current month top expenses failed', {
+        ownerUserId,
+      });
+      throw error;
+    }
+  }
+
+  async getCurrentYearMonthlyExpenses(
+    ownerUserId: string,
+  ): Promise<CurrentYearMonthlyExpenseResponseDto> {
+    const currentYear = this.getCurrentYearRange();
+
+    try {
+      const aggregates = await this.expenseModel
+        .aggregate<MonthAggregate>([
+          {
+            $match: {
+              ownerUserId,
+              spentAt: { $gte: currentYear.start, $lt: currentYear.end },
+            },
+          },
+          {
+            $group: {
+              _id: '$monthKey',
+              count: { $sum: 1 },
+              totalPaise: { $sum: '$amountPaise' },
+            },
+          },
+        ])
+        .exec();
+      const aggregateMap = new Map(
+        aggregates.map((aggregate) => [aggregate._id, aggregate]),
+      );
+
+      return {
+        year: currentYear.year,
+        startDate: currentYear.startDate,
+        endDate: currentYear.endDate,
+        months: Array.from({ length: 12 }, (_, index) => {
+          const monthRange = this.getMonthRange(currentYear.year, index + 1);
+          const aggregate = aggregateMap.get(monthRange.monthKey);
+
+          return {
+            monthNumber: index + 1,
+            monthKey: monthRange.monthKey,
+            monthName: monthRange.monthName,
+            label: this.formatMonthShortName(monthRange.start),
+            totalPaise: aggregate?.totalPaise ?? 0,
+            count: aggregate?.count ?? 0,
+          };
+        }),
+      };
+    } catch (error) {
+      this.logger.error(error, 'Report current year monthly expenses failed', {
         ownerUserId,
       });
       throw error;
@@ -519,6 +587,21 @@ export class ReportService {
     return this.getMonthRange(now.getUTCFullYear(), now.getUTCMonth() + 1);
   }
 
+  private getCurrentYearRange(): YearRange {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const start = new Date(Date.UTC(year, 0, 1));
+    const end = new Date(Date.UTC(year + 1, 0, 1));
+
+    return {
+      year,
+      start,
+      end,
+      startDate: this.formatDateOnly(start),
+      endDate: this.formatDateOnly(new Date(end.getTime() - 24 * 60 * 60 * 1000)),
+    };
+  }
+
   private getRelativeMonthRange(
     monthRange: MonthRange,
     monthOffset: number,
@@ -552,6 +635,13 @@ export class ReportService {
       month: 'long',
       timeZone: 'UTC',
       year: 'numeric',
+    }).format(date);
+  }
+
+  private formatMonthShortName(date: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      timeZone: 'UTC',
     }).format(date);
   }
 
