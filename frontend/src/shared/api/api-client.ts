@@ -17,6 +17,7 @@ export function apiFetch(path: string, init: RequestInit = {}) {
 
   return fetch(buildApiUrl(path), {
     ...init,
+    credentials: 'omit',
     headers,
   });
 }
