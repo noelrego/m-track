@@ -39,18 +39,5 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  mongo-express:
-    image: mongo-express:1.0.2-20
-    restart: unless-stopped
-    environment:
-      TZ: ${TZ:-UTC}
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_PORT: 27017
-      ME_CONFIG_BASICAUTH: "false"
-    ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
-    depends_on:
-      - mongo
-
 volumes:
   mongo_data:

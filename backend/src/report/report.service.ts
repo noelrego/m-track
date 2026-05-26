@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import {
   AppLogger,
   CurrentMonthCategoryCardsResponseDto,
@@ -9,6 +9,8 @@ import {
   CurrentYearMonthlyExpenseResponseDto,
   EXPENSE_CATEGORY_KEYS,
   ExpenseCategoryKey,
+  MonthlyCategoryExpenseTrendResponseDto,
+  MonthlyTagExpenseReportResponseDto,
   ReportCategoryAmountDto,
   ReportInsightDto,
   ReportInsightsResponseDto,
@@ -17,12 +19,22 @@ import {
 } from '../common';
 import { Category, CategoryDocument } from '../schemas/category.schema';
 import { Expense, ExpenseDocument } from '../schemas/expense.schema';
+import { Tag, TagDocument } from '../schemas/tag.schema';
 
 interface MonthRange {
   end: Date;
   endDate: string;
   monthKey: string;
   monthName: string;
+  start: Date;
+  startDate: string;
+}
+
+interface MonthTrendRange {
+  end: Date;
+  endDate: string;
+  monthCount: number;
+  months: MonthRange[];
   start: Date;
   startDate: string;
 }
@@ -39,6 +51,32 @@ interface MonthAggregate {
   totalPaise: number;
 }
 
+interface CategoryMonthAggregate {
+  _id: {
+    categoryId: string;
+    monthKey: string;
+  };
+  count: number;
+  totalPaise: number;
+}
+
+interface TagAggregate {
+  _id: string;
+  count: number;
+  totalPaise: number;
+}
+
+interface UniqueExpenseAggregate {
+  _id: null;
+  count: number;
+  totalPaise: number;
+}
+
+interface SelectedTag {
+  id: string;
+  name: string;
+}
+
 interface CategoryLookup {
   byId: Map<string, CategoryDocument>;
   byKey: Map<ExpenseCategoryKey, CategoryDocument>;
@@ -53,14 +91,6 @@ interface WeekRange {
   weekNumber: number;
 }
 
-interface YearRange {
-  end: Date;
-  endDate: string;
-  start: Date;
-  startDate: string;
-  year: number;
-}
-
 const ALL_CATEGORY_KEYS = EXPENSE_CATEGORY_KEYS;
 const NEEDS_WANTS_KEYS = [ExpenseCategoryKey.Needs, ExpenseCategoryKey.Wants];
 const CHART_CATEGORY_KEYS = [
@@ -68,6 +98,8 @@ const CHART_CATEGORY_KEYS = [
   ExpenseCategoryKey.Wants,
   ExpenseCategoryKey.Extra,
 ];
+const MONTHLY_EXPENSE_MONTH_COUNTS = [5, 8, 12];
+const DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT = 5;
 
 const CATEGORY_LABELS: Record<ExpenseCategoryKey, string> = {
   [ExpenseCategoryKey.Needs]: 'Needs',
@@ -82,6 +114,7 @@ export class ReportService {
   constructor(
     @InjectModel(Category.name) private readonly categoryModel: Model<CategoryDocument>,
     @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
+    @InjectModel(Tag.name) private readonly tagModel: Model<TagDocument>,
     private readonly logger: AppLogger,
   ) {}
 
@@ -261,8 +294,9 @@ export class ReportService {
 
   async getCurrentYearMonthlyExpenses(
     ownerUserId: string,
+    monthCount = DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT,
   ): Promise<CurrentYearMonthlyExpenseResponseDto> {
-    const currentYear = this.getCurrentYearRange();
+    const monthTrendRange = this.getRecentMonthTrendRange(monthCount);
 
     try {
       const aggregates = await this.expenseModel
@@ -270,7 +304,10 @@ export class ReportService {
           {
             $match: {
               ownerUserId,
-              spentAt: { $gte: currentYear.start, $lt: currentYear.end },
+              spentAt: {
+                $gte: monthTrendRange.start,
+                $lt: monthTrendRange.end,
+              },
             },
           },
           {
@@ -287,15 +324,20 @@ export class ReportService {
       );
 
       return {
-        year: currentYear.year,
-        startDate: currentYear.startDate,
-        endDate: currentYear.endDate,
-        months: Array.from({ length: 12 }, (_, index) => {
-          const monthRange = this.getMonthRange(currentYear.year, index + 1);
+        year:
+          monthTrendRange.months[
+            monthTrendRange.months.length - 1
+          ]?.start.getUTCFullYear() ??
+          new Date().getUTCFullYear(),
+        monthCount: monthTrendRange.monthCount,
+        rangeLabel: `Last ${monthTrendRange.monthCount} months`,
+        startDate: monthTrendRange.startDate,
+        endDate: monthTrendRange.endDate,
+        months: monthTrendRange.months.map((monthRange) => {
           const aggregate = aggregateMap.get(monthRange.monthKey);
 
           return {
-            monthNumber: index + 1,
+            monthNumber: monthRange.start.getUTCMonth() + 1,
             monthKey: monthRange.monthKey,
             monthName: monthRange.monthName,
             label: this.formatMonthShortName(monthRange.start),
@@ -306,7 +348,166 @@ export class ReportService {
       };
     } catch (error) {
       this.logger.error(error, 'Report current year monthly expenses failed', {
+        monthCount: monthTrendRange.monthCount,
         ownerUserId,
+      });
+      throw error;
+    }
+  }
+
+  async getMonthlyCategoryExpenseTrend(
+    ownerUserId: string,
+    monthCount = DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT,
+  ): Promise<MonthlyCategoryExpenseTrendResponseDto> {
+    const monthTrendRange = this.getRecentMonthTrendRange(monthCount);
+
+    try {
+      const categories = await this.loadStaticCategories();
+      const categoryIds = this.getCategoryIds(categories, ALL_CATEGORY_KEYS);
+      const aggregateMap = categoryIds.length
+        ? await this.aggregateByCategoryAndMonth(
+            ownerUserId,
+            monthTrendRange,
+            categoryIds,
+          )
+        : new Map<string, CategoryMonthAggregate>();
+      const months = this.toMonthlyExpenseItems(monthTrendRange, new Map());
+
+      return {
+        year:
+          monthTrendRange.months[
+            monthTrendRange.months.length - 1
+          ]?.start.getUTCFullYear() ??
+          new Date().getUTCFullYear(),
+        monthCount: monthTrendRange.monthCount,
+        rangeLabel: `Last ${monthTrendRange.monthCount} months`,
+        startDate: monthTrendRange.startDate,
+        endDate: monthTrendRange.endDate,
+        months,
+        categories: ALL_CATEGORY_KEYS.map((categoryKey) => {
+          const category = categories.byKey.get(categoryKey);
+
+          return {
+            categoryId: category?.id,
+            categoryName: category?.name ?? CATEGORY_LABELS[categoryKey],
+            normalizedName: categoryKey,
+            months: monthTrendRange.months.map((monthRange) => {
+              const aggregate = category
+                ? aggregateMap.get(
+                    this.toCategoryMonthKey(category.id, monthRange.monthKey),
+                  )
+                : undefined;
+
+              return {
+                monthNumber: monthRange.start.getUTCMonth() + 1,
+                monthKey: monthRange.monthKey,
+                monthName: monthRange.monthName,
+                label: this.formatMonthShortName(monthRange.start),
+                totalPaise: aggregate?.totalPaise ?? 0,
+                count: aggregate?.count ?? 0,
+              };
+            }),
+          };
+        }),
+      };
+    } catch (error) {
+      this.logger.error(error, 'Report monthly category trend failed', {
+        monthCount: monthTrendRange.monthCount,
+        ownerUserId,
+      });
+      throw error;
+    }
+  }
+
+  async getMonthlyTagExpenseReport(
+    ownerUserId: string,
+    monthKey?: string,
+    tagIds: string[] = [],
+  ): Promise<MonthlyTagExpenseReportResponseDto> {
+    const monthRange = this.getMonthRangeFromKey(monthKey);
+    const requestedTagIds = this.toUniqueObjectIds(tagIds);
+
+    try {
+      if (!requestedTagIds.length) {
+        return this.toEmptyMonthlyTagReport(monthRange);
+      }
+
+      const tags = await this.tagModel
+        .find({ _id: { $in: requestedTagIds }, ownerUserId })
+        .exec();
+      const tagsById = new Map(
+        tags.map((tag) => [tag.id, { id: tag.id, name: tag.name }]),
+      );
+      const selectedTags = requestedTagIds
+        .map((tagId) => tagsById.get(tagId))
+        .filter((tag): tag is SelectedTag => Boolean(tag));
+      const selectedTagIds = selectedTags.map((tag) => tag.id);
+
+      if (!selectedTagIds.length) {
+        return this.toEmptyMonthlyTagReport(monthRange);
+      }
+
+      const matchStage = {
+        ownerUserId,
+        spentAt: { $gte: monthRange.start, $lt: monthRange.end },
+        tagIds: { $in: selectedTagIds },
+      };
+      const [uniqueAggregate, tagAggregates] = await Promise.all([
+        this.expenseModel
+          .aggregate<UniqueExpenseAggregate>([
+            { $match: matchStage },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                totalPaise: { $sum: '$amountPaise' },
+              },
+            },
+          ])
+          .exec(),
+        this.expenseModel
+          .aggregate<TagAggregate>([
+            { $match: matchStage },
+            { $unwind: '$tagIds' },
+            { $match: { tagIds: { $in: selectedTagIds } } },
+            {
+              $group: {
+                _id: '$tagIds',
+                count: { $sum: 1 },
+                totalPaise: { $sum: '$amountPaise' },
+              },
+            },
+          ])
+          .exec(),
+      ]);
+      const aggregateMap = new Map(
+        tagAggregates.map((aggregate) => [aggregate._id, aggregate]),
+      );
+
+      return {
+        monthKey: monthRange.monthKey,
+        monthName: monthRange.monthName,
+        startDate: monthRange.startDate,
+        endDate: monthRange.endDate,
+        selectedTagIds,
+        totalPaise: uniqueAggregate[0]?.totalPaise ?? 0,
+        count: uniqueAggregate[0]?.count ?? 0,
+        tags: selectedTags.map((tag) => {
+          const aggregate = aggregateMap.get(tag.id);
+
+          return {
+            tagId: tag.id,
+            tagName: tag.name,
+            totalPaise: aggregate?.totalPaise ?? 0,
+            count: aggregate?.count ?? 0,
+          };
+        }),
+      };
+    } catch (error) {
+      this.logger.error(error, 'Report monthly tag expenses failed', {
+        monthKey: monthRange.monthKey,
+        ownerUserId,
+        tagCount: requestedTagIds.length,
       });
       throw error;
     }
@@ -393,6 +594,65 @@ export class ReportService {
       .exec();
 
     return new Map(aggregates.map((aggregate) => [aggregate._id, aggregate]));
+  }
+
+  private async aggregateByCategoryAndMonth(
+    ownerUserId: string,
+    monthTrendRange: MonthTrendRange,
+    categoryIds: string[],
+  ): Promise<Map<string, CategoryMonthAggregate>> {
+    const aggregates = await this.expenseModel
+      .aggregate<CategoryMonthAggregate>([
+        {
+          $match: {
+            ownerUserId,
+            categoryId: { $in: categoryIds },
+            spentAt: {
+              $gte: monthTrendRange.start,
+              $lt: monthTrendRange.end,
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              categoryId: '$categoryId',
+              monthKey: '$monthKey',
+            },
+            count: { $sum: 1 },
+            totalPaise: { $sum: '$amountPaise' },
+          },
+        },
+      ])
+      .exec();
+
+    return new Map(
+      aggregates.map((aggregate) => [
+        this.toCategoryMonthKey(
+          aggregate._id.categoryId,
+          aggregate._id.monthKey,
+        ),
+        aggregate,
+      ]),
+    );
+  }
+
+  private toMonthlyExpenseItems(
+    monthTrendRange: MonthTrendRange,
+    aggregateMap: Map<string, MonthAggregate>,
+  ) {
+    return monthTrendRange.months.map((monthRange) => {
+      const aggregate = aggregateMap.get(monthRange.monthKey);
+
+      return {
+        monthNumber: monthRange.start.getUTCMonth() + 1,
+        monthKey: monthRange.monthKey,
+        monthName: monthRange.monthName,
+        label: this.formatMonthShortName(monthRange.start),
+        totalPaise: aggregate?.totalPaise ?? 0,
+        count: aggregate?.count ?? 0,
+      };
+    });
   }
 
   private toInsight(
@@ -587,18 +847,39 @@ export class ReportService {
     return this.getMonthRange(now.getUTCFullYear(), now.getUTCMonth() + 1);
   }
 
-  private getCurrentYearRange(): YearRange {
-    const now = new Date();
-    const year = now.getUTCFullYear();
-    const start = new Date(Date.UTC(year, 0, 1));
-    const end = new Date(Date.UTC(year + 1, 0, 1));
+  private getMonthRangeFromKey(monthKey?: string): MonthRange {
+    if (!monthKey || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+      return this.getCurrentMonthRange();
+    }
+
+    const [year, month] = monthKey.split('-').map(Number);
+
+    return this.getMonthRange(year, month);
+  }
+
+  private getRecentMonthTrendRange(monthCount: number): MonthTrendRange {
+    const normalizedMonthCount = MONTHLY_EXPENSE_MONTH_COUNTS.includes(monthCount)
+      ? monthCount
+      : DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT;
+    const currentMonth = this.getCurrentMonthRange();
+    const months = Array.from({ length: normalizedMonthCount }, (_, index) =>
+      this.getRelativeMonthRange(
+        currentMonth,
+        index - normalizedMonthCount + 1,
+      ),
+    );
+    const start = months[0].start;
+    const end = months.at(-1)?.end ?? currentMonth.end;
 
     return {
-      year,
-      start,
       end,
+      endDate: this.formatDateOnly(
+        new Date(end.getTime() - 24 * 60 * 60 * 1000),
+      ),
+      monthCount: normalizedMonthCount,
+      months,
+      start,
       startDate: this.formatDateOnly(start),
-      endDate: this.formatDateOnly(new Date(end.getTime() - 24 * 60 * 60 * 1000)),
     };
   }
 
@@ -647,5 +928,28 @@ export class ReportService {
 
   private toMonthKey(year: number, month: number): string {
     return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  private toCategoryMonthKey(categoryId: string, monthKey: string): string {
+    return `${categoryId}:${monthKey}`;
+  }
+
+  private toUniqueObjectIds(ids: string[]): string[] {
+    return Array.from(new Set(ids.filter((id) => isValidObjectId(id))));
+  }
+
+  private toEmptyMonthlyTagReport(
+    monthRange: MonthRange,
+  ): MonthlyTagExpenseReportResponseDto {
+    return {
+      monthKey: monthRange.monthKey,
+      monthName: monthRange.monthName,
+      startDate: monthRange.startDate,
+      endDate: monthRange.endDate,
+      selectedTagIds: [],
+      totalPaise: 0,
+      count: 0,
+      tags: [],
+    };
   }
 }

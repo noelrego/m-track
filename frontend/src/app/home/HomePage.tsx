@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   CalendarDays,
@@ -234,14 +235,23 @@ function HomePage() {
           <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-500">
             Add today&apos;s expense with category, tags, and note in one flow.
           </p>
-          <button
-            className="mt-6 inline-flex items-center gap-2 rounded-md bg-[#f36f4e] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
-            onClick={() => setIsAddExpenseOpen(true)}
-            type="button"
-          >
-            <Plus size={18} />
-            Add expense
-          </button>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex h-9 min-w-[112px] items-center justify-center gap-1.5 rounded-md bg-[#f36f4e] px-3 text-xs font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
+              onClick={() => setIsAddExpenseOpen(true)}
+              type="button"
+            >
+              <Plus size={15} />
+              Add expense
+            </button>
+            <Link
+              className="inline-flex h-9 min-w-[112px] items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+              to="/expenses"
+            >
+              <ReceiptText size={14} />
+              View expenses
+            </Link>
+          </div>
         </motion.div>
       </div>
 

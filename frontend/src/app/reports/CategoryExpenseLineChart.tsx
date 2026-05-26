@@ -1,33 +1,53 @@
 import { ResponsiveLine } from '@nivo/line';
+import { ExpenseCategoryKey } from '../../common';
 import { formatInr } from '../../shared/utils/money';
-import type { CurrentYearMonthlyExpenseResponse } from './reports.types';
+import type { MonthlyCategoryExpenseTrendResponse } from './reports.types';
 
-interface YearlyExpenseLineChartProps {
-  data: CurrentYearMonthlyExpenseResponse | null;
+interface CategoryExpenseLineChartProps {
+  data: MonthlyCategoryExpenseTrendResponse | null;
+  selectedCategory: ExpenseCategoryKey | 'all';
 }
 
-export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
-  const points =
-    data?.months.map((month) => ({
-      x: month.monthKey,
-      y: month.totalPaise / 100,
-      label: month.label,
-      monthName: month.monthName,
-      totalPaise: month.totalPaise,
-    })) ?? [];
+const categoryColors: Record<ExpenseCategoryKey, string> = {
+  [ExpenseCategoryKey.Needs]: '#66bfb6',
+  [ExpenseCategoryKey.Wants]: '#f5b33d',
+  [ExpenseCategoryKey.Emis]: '#8d78d6',
+  [ExpenseCategoryKey.Extra]: '#f36f4e',
+  [ExpenseCategoryKey.Invest]: '#242424',
+};
+
+export function CategoryExpenseLineChart({
+  data,
+  selectedCategory,
+}: CategoryExpenseLineChartProps) {
+  const visibleCategories =
+    data?.categories.filter((category) =>
+      selectedCategory === 'all'
+        ? true
+        : category.normalizedName === selectedCategory,
+    ) ?? [];
   const labelByMonthKey = new Map(
-    points.map((point) => [point.x, point.label]),
+    data?.months.map((month) => [month.monthKey, month.label]) ?? [],
   );
   const tickValues =
-    points.length > 8
-      ? points.filter((_, index) => index % 2 === 0).map((point) => point.x)
+    (data?.months.length ?? 0) > 8
+      ? data?.months
+          .filter((_, index) => index % 2 === 0)
+          .map((month) => month.monthKey)
       : undefined;
-  const chartData = [
-    {
-      id: 'Total expense',
-      data: points,
-    },
-  ];
+  const chartData = visibleCategories.map((category) => ({
+    id: category.categoryName,
+    data: category.months.map((month) => ({
+      x: month.monthKey,
+      y: month.totalPaise / 100,
+      categoryName: category.categoryName,
+      monthName: month.monthName,
+      totalPaise: month.totalPaise,
+    })),
+  }));
+  const colors = visibleCategories.map(
+    (category) => categoryColors[category.normalizedName],
+  );
 
   return (
     <div className="h-[260px] min-h-[260px]">
@@ -45,10 +65,10 @@ export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
           tickPadding: 10,
           tickSize: 0,
         }}
-        colors={['#f36f4e']}
+        colors={colors}
         curve="monotoneX"
         data={chartData}
-        enableArea
+        enableArea={false}
         enableGridX={false}
         enablePoints
         gridYValues={4}
@@ -57,8 +77,7 @@ export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
         motionConfig="gentle"
         pointBorderColor="#ffffff"
         pointBorderWidth={2}
-        pointColor="#f36f4e"
-        pointSize={8}
+        pointSize={7}
         role="application"
         theme={{
           axis: {
@@ -71,8 +90,8 @@ export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
           },
           crosshair: {
             line: {
-              stroke: '#f36f4e',
-              strokeOpacity: 0.35,
+              stroke: '#18181b',
+              strokeOpacity: 0.18,
               strokeWidth: 1,
             },
           },
@@ -96,6 +115,10 @@ export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
             typeof point.data.totalPaise === 'number'
               ? point.data.totalPaise
               : Number(point.data.y) * 100;
+          const categoryName =
+            typeof point.data.categoryName === 'string'
+              ? point.data.categoryName
+              : String(point.seriesId);
           const monthName =
             typeof point.data.monthName === 'string'
               ? point.data.monthName
@@ -103,8 +126,11 @@ export function YearlyExpenseLineChart({ data }: YearlyExpenseLineChartProps) {
 
           return (
             <div className="rounded-md bg-white px-3 py-2 text-xs shadow-xl shadow-zinc-950/10">
-              <p className="font-bold text-zinc-950">{monthName}</p>
-              <p className="mt-1 text-zinc-500">{formatInr(totalPaise)}</p>
+              <p className="font-bold text-zinc-950">{categoryName}</p>
+              <p className="mt-1 text-zinc-500">{monthName}</p>
+              <p className="mt-1 font-semibold text-zinc-950">
+                {formatInr(totalPaise)}
+              </p>
             </div>
           );
         }}

@@ -23,3 +23,14 @@ export function parseInrToPaise(value: string) {
 
   return amountPaise;
 }
+
+export function normalizeInrInput(value: string) {
+  const numericValue = value.replace(/,/g, '').replace(/[^\d.]/g, '');
+  const [rupees, ...decimalParts] = numericValue.split('.');
+
+  if (!decimalParts.length) {
+    return rupees;
+  }
+
+  return `${rupees}.${decimalParts.join('').slice(0, 2)}`;
+}

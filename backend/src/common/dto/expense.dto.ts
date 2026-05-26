@@ -88,6 +88,18 @@ export class ListExpensesQueryDto {
   @Min(1)
   @Max(50)
   limit?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    minimum: 1,
+    description: 'Page number to return. Defaults to 1.',
+  })
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10_000)
+  page?: number;
 }
 
 export class MonthlyExpenseSummaryQueryDto {
@@ -154,6 +166,32 @@ export class ExpenseDeleteResponseDto {
 
   @ApiProperty({ example: true })
   deleted: boolean;
+}
+
+export class ListExpensesResponseDto {
+  @ApiProperty({ example: '2026-05' })
+  monthKey: string;
+
+  @ApiProperty({ example: '2026-05-01' })
+  startDate: string;
+
+  @ApiProperty({ example: '2026-05-31' })
+  endDate: string;
+
+  @ApiProperty({ example: 1 })
+  page: number;
+
+  @ApiProperty({ example: 10 })
+  limit: number;
+
+  @ApiProperty({ example: 42 })
+  total: number;
+
+  @ApiProperty({ example: 5 })
+  totalPages: number;
+
+  @ApiProperty({ type: () => [ExpenseResponseDto] })
+  expenses: ExpenseResponseDto[];
 }
 
 export class ExpenseCategorySummaryDto {

@@ -1,5 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, FolderKanban, Home, Tags, Users } from 'lucide-react';
+import {
+  BarChart3,
+  FolderKanban,
+  Home,
+  ReceiptText,
+  Tags,
+  Users,
+} from 'lucide-react';
 import { UserRole } from '../../common';
 
 export interface NavigationItem {
@@ -20,6 +27,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: Tags,
     label: 'Tags',
     path: '/tags',
+    roles: [UserRole.Admin, UserRole.User],
+  },
+  {
+    icon: ReceiptText,
+    label: 'Expenses',
+    path: '/expenses',
     roles: [UserRole.Admin, UserRole.User],
   },
   {

@@ -24,6 +24,7 @@ import {
   CreateExpenseDto,
   ExpenseDeleteResponseDto,
   ExpenseResponseDto,
+  ListExpensesResponseDto,
   ListExpensesQueryDto,
   MonthlyExpenseSummaryQueryDto,
   MonthlyExpenseSummaryResponseDto,
@@ -50,6 +51,23 @@ export class ExpenseController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.expenseService.createExpense(createExpenseDto, request.user!.sub);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'List expenses for calendar month',
+    description:
+      'Defaults to the current UTC calendar month. Results never mix expenses from different months.',
+  })
+  @ApiOkResponse({
+    description: 'Paginated expenses returned successfully.',
+    type: ListExpensesResponseDto,
+  })
+  listExpenses(
+    @Query() query: ListExpensesQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.expenseService.listExpenses(query, request.user!.sub);
   }
 
   @Get('recent')

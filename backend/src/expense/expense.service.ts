@@ -6,6 +6,7 @@ import {
   CreateExpenseDto,
   ExpenseCategorySummaryDto,
   ExpenseResponseDto,
+  ListExpensesResponseDto,
   ListExpensesQueryDto,
   MonthlyExpenseSummaryQueryDto,
   MonthlyExpenseSummaryResponseDto,
@@ -101,6 +102,50 @@ export class ExpenseService {
       this.logger.error(error, 'Expense list recent failed', {
         ownerUserId,
         monthKey: monthRange.monthKey,
+      });
+      throw error;
+    }
+  }
+
+  async listExpenses(
+    query: ListExpensesQueryDto,
+    ownerUserId: string,
+  ): Promise<ListExpensesResponseDto> {
+    const monthRange = this.resolveMonthRange(query.month);
+    const limit = query.limit ?? 10;
+    const page = query.page ?? 1;
+    const skip = (page - 1) * limit;
+
+    try {
+      const filter = {
+        ownerUserId,
+        spentAt: { $gte: monthRange.start, $lt: monthRange.end },
+      };
+      const [expenses, total] = await Promise.all([
+        this.expenseModel
+          .find(filter)
+          .sort({ spentAt: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.expenseModel.countDocuments(filter).exec(),
+      ]);
+
+      return {
+        monthKey: monthRange.monthKey,
+        startDate: monthRange.startDate,
+        endDate: monthRange.endDate,
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        expenses: await this.toExpenseResponses(expenses, ownerUserId),
+      };
+    } catch (error) {
+      this.logger.error(error, 'Expense list failed', {
+        ownerUserId,
+        monthKey: monthRange.monthKey,
+        page,
       });
       throw error;
     }

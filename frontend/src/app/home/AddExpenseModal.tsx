@@ -9,7 +9,7 @@ import {
   readApiBody,
 } from '../../shared/api/api-client';
 import { Modal } from '../../shared/components/Modal';
-import { parseInrToPaise } from '../../shared/utils/money';
+import { normalizeInrInput, parseInrToPaise } from '../../shared/utils/money';
 import type { CategoryOption, TagOption } from './home.types';
 
 interface AddExpenseModalProps {
@@ -91,12 +91,10 @@ export function AddExpenseModal({
   const canCreateTag = useMemo(() => {
     const search = tagSearch.trim().toLowerCase();
 
-    if (!search || visibleTags.length) {
-      return false;
-    }
-
-    return !tags.some((tag) => tag.name.toLowerCase() === search);
-  }, [tagSearch, tags, visibleTags.length]);
+    return (
+      Boolean(search) && !tags.some((tag) => tag.name.toLowerCase() === search)
+    );
+  }, [tagSearch, tags]);
 
   async function loadOptions(signal?: AbortSignal) {
     setIsLoadingOptions(true);
@@ -156,7 +154,7 @@ export function AddExpenseModal({
   }
 
   function closeModal() {
-    if (isSaving) {
+    if (isSaving || isCreatingTag) {
       return;
     }
 
@@ -280,9 +278,13 @@ export function AddExpenseModal({
             <input
               className="mt-1.5 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
               inputMode="decimal"
-              onChange={(event) => setAmount(event.target.value)}
+              onChange={(event) =>
+                setAmount(normalizeInrInput(event.target.value))
+              }
+              pattern="\d+(\.\d{0,2})?"
               placeholder="200.96"
               required
+              type="text"
               value={amount}
             />
           </label>
@@ -415,11 +417,11 @@ export function AddExpenseModal({
           >
             Cancel
           </button>
-          <button
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSaving || isLoadingOptions}
-            type="submit"
-          >
+            <button
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSaving || isLoadingOptions || isCreatingTag}
+              type="submit"
+            >
             {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
             Add expense
           </button>

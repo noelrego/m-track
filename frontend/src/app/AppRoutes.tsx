@@ -9,6 +9,7 @@ const AppShell = lazy(() => import('./layout/AppShell'));
 const AboutPage = lazy(() => import('../public/about/AboutPage'));
 const LoginPage = lazy(() => import('../public/login/LoginPage'));
 const HomePage = lazy(() => import('./home/HomePage'));
+const ExpensesPage = lazy(() => import('./expenses/ExpensesPage'));
 const TagsPage = lazy(() => import('./tags/TagsPage'));
 const ReportsPage = lazy(() => import('./reports/ReportsPage'));
 const CategoriesPage = lazy(() => import('./categories/CategoriesPage'));
@@ -32,6 +33,7 @@ export function AppRoutes() {
             <Route element={<AppShell />}>
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
+              <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/tags" element={<TagsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route

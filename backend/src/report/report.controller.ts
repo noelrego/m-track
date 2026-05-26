@@ -1,4 +1,4 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -12,6 +12,10 @@ import {
   CurrentMonthTopExpensesResponseDto,
   CurrentMonthWeeklyReportResponseDto,
   CurrentYearMonthlyExpenseResponseDto,
+  MonthlyCategoryExpenseTrendResponseDto,
+  MonthlyExpenseWindowQueryDto,
+  MonthlyTagExpenseReportQueryDto,
+  MonthlyTagExpenseReportResponseDto,
   ReportInsightsResponseDto,
 } from '../common';
 import { ReportService } from './report.service';
@@ -81,15 +85,62 @@ export class ReportController {
 
   @Get('current-year/monthly-expenses')
   @ApiOperation({
-    summary: 'Get current year monthly expense totals',
+    summary: 'Get recent monthly expense totals',
     description:
-      'Returns all 12 months for the current UTC year with total expense across every category.',
+      'Returns the last 5, 8, or 12 UTC months with total expense across every category. Defaults to the last 5 months.',
   })
   @ApiOkResponse({
-    description: 'Current year monthly expense totals returned successfully.',
+    description: 'Monthly expense totals returned successfully.',
     type: CurrentYearMonthlyExpenseResponseDto,
   })
-  getCurrentYearMonthlyExpenses(@Req() request: AuthenticatedRequest) {
-    return this.reportService.getCurrentYearMonthlyExpenses(request.user!.sub);
+  getCurrentYearMonthlyExpenses(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MonthlyExpenseWindowQueryDto,
+  ) {
+    return this.reportService.getCurrentYearMonthlyExpenses(
+      request.user!.sub,
+      query.months,
+    );
+  }
+
+  @Get('monthly-expenses/by-category')
+  @ApiOperation({
+    summary: 'Get recent monthly expense totals by category',
+    description:
+      'Returns the last 5, 8, or 12 UTC months with a monthly total series for each static category. Defaults to the last 5 months.',
+  })
+  @ApiOkResponse({
+    description: 'Monthly category expense trends returned successfully.',
+    type: MonthlyCategoryExpenseTrendResponseDto,
+  })
+  getMonthlyCategoryExpenseTrend(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MonthlyExpenseWindowQueryDto,
+  ) {
+    return this.reportService.getMonthlyCategoryExpenseTrend(
+      request.user!.sub,
+      query.months,
+    );
+  }
+
+  @Get('monthly-tags')
+  @ApiOperation({
+    summary: 'Get monthly expense totals by selected tags',
+    description:
+      'Returns totals for one UTC month across the selected user-owned tags, including a unique matching-expense total and per-tag totals.',
+  })
+  @ApiOkResponse({
+    description: 'Monthly tag expense report returned successfully.',
+    type: MonthlyTagExpenseReportResponseDto,
+  })
+  getMonthlyTagExpenseReport(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MonthlyTagExpenseReportQueryDto,
+  ) {
+    return this.reportService.getMonthlyTagExpenseReport(
+      request.user!.sub,
+      query.month,
+      query.tagIds,
+    );
   }
 }
