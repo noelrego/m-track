@@ -1,4 +1,5 @@
 export * from './decorators/auth.decorator';
+export * from './dto/ai-assist.dto';
 export * from './dto/admin.dto';
 export * from './dto/auth.dto';
 export * from './dto/category.dto';

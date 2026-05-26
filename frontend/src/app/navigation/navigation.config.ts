@@ -4,6 +4,7 @@ import {
   FolderKanban,
   Home,
   ReceiptText,
+  Sparkles,
   Tags,
   Users,
 } from 'lucide-react';
@@ -21,6 +22,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: Home,
     label: 'Home',
     path: '/home',
+    roles: [UserRole.Admin, UserRole.User],
+  },
+  {
+    icon: Sparkles,
+    label: 'AI Assist',
+    path: '/ai-assist',
     roles: [UserRole.Admin, UserRole.User],
   },
   {

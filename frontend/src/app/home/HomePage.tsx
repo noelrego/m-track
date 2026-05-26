@@ -235,21 +235,28 @@ function HomePage() {
           <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-500">
             Add today&apos;s expense with category, tags, and note in one flow.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2">
+          <div className="mt-6 grid grid-cols-3 gap-2">
             <button
-              className="inline-flex h-9 min-w-[112px] items-center justify-center gap-1.5 rounded-md bg-[#f36f4e] px-3 text-xs font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md bg-[#f36f4e] px-2 text-[11px] font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
               onClick={() => setIsAddExpenseOpen(true)}
               type="button"
             >
-              <Plus size={15} />
-              Add expense
+              <Plus size={13} />
+              <span className="truncate">Add Expense</span>
             </button>
             <Link
-              className="inline-flex h-9 min-w-[112px] items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-[#eadfd5] bg-white px-2 text-[11px] font-bold text-zinc-600 transition hover:border-[#66bfb6]/60 hover:text-[#287d74]"
+              to="/ai-assist"
+            >
+              <Sparkles size={13} />
+              <span className="truncate">AI Assist</span>
+            </Link>
+            <Link
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-[#eadfd5] bg-white px-2 text-[11px] font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
               to="/expenses"
             >
-              <ReceiptText size={14} />
-              View expenses
+              <ReceiptText size={13} />
+              <span className="truncate">View Expense</span>
             </Link>
           </div>
         </motion.div>

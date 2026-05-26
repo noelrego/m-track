@@ -13,8 +13,8 @@ const levelPriority: Record<LogLevel, number> = {
 export class AppLogger implements LoggerService {
   private readonly level: LogLevel = this.resolveLogLevel(process.env.LOG_LEVEL);
 
-  info(message: string): void {
-    this.write('info', message);
+  info(message: string, data?: unknown): void {
+    this.write('info', message, data);
   }
 
   log(message: unknown): void {

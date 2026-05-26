@@ -8,6 +8,7 @@ import { RoleRoute } from './routing/RoleRoute';
 const AppShell = lazy(() => import('./layout/AppShell'));
 const AboutPage = lazy(() => import('../public/about/AboutPage'));
 const LoginPage = lazy(() => import('../public/login/LoginPage'));
+const AiAssistPage = lazy(() => import('./ai-assist/AiAssistPage'));
 const HomePage = lazy(() => import('./home/HomePage'));
 const ExpensesPage = lazy(() => import('./expenses/ExpensesPage'));
 const TagsPage = lazy(() => import('./tags/TagsPage'));
@@ -33,6 +34,7 @@ export function AppRoutes() {
             <Route element={<AppShell />}>
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
+              <Route path="/ai-assist" element={<AiAssistPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/tags" element={<TagsPage />} />
               <Route path="/reports" element={<ReportsPage />} />

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdminModule } from './admin/admin.module';
+import { AiAssistModule } from './aiassist/aiassist.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -26,6 +27,7 @@ import { TagsModule } from './tags/tags.module';
     }),
     AuthModule,
     AdminModule,
+    AiAssistModule,
     CategoriesModule,
     TagsModule,
     ExpenseModule,
