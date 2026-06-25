@@ -63,6 +63,63 @@ Application logs are written to stdout/stderr in this format:
 This is enough for Render's built-in logs. Use `LOG_LEVEL=debug` locally and
 `LOG_LEVEL=info` in production unless you need deeper diagnostics.
 
+## AI Model Setup
+
+AI Assist uses OpenRouter from the NestJS backend. The React app records or
+collects text, sends that text to NestJS, and NestJS calls OpenRouter to convert
+the message into a structured expense draft.
+
+1. Create or log in to your OpenRouter account at https://openrouter.ai.
+2. Open the OpenRouter dashboard and create an API key.
+3. Copy the key once and store it only in environment variables. Do not commit
+   real API keys to Git.
+4. Choose a model. This project is configured to use this Google model by
+   default:
+
+```env
+OPENROUTER_MODEL=google/gemini-3.1-flash-lite
+```
+
+5. Add these values to `backend/.env` for local development, or to the Render
+   environment variables for production:
+
+```env
+OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
+OPENROUTER_MODEL=google/gemini-3.1-flash-lite
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_APP_NAME=SpendWise
+OPENROUTER_APP_URL=http://localhost:5173
+```
+
+For production, set `OPENROUTER_APP_URL` to the hosted frontend URL, such as the
+Vercel URL or your custom domain. OpenRouter receives this value through the
+`HTTP-Referer` header, and `OPENROUTER_APP_NAME` through the
+`X-OpenRouter-Title` header.
+
+6. Restart the backend after changing env values:
+
+```bash
+docker compose exec backend npm run start:dev
+```
+
+Or on Render, redeploy/restart the NestJS service after saving the environment
+variables.
+
+7. Test through the React AI Assist page, or call the backend route directly with
+   an authenticated user token:
+
+```bash
+curl -X POST http://localhost:3000/api/aiassist/expense-draft \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"I spent 100 rs on milk","localDate":"2026-06-25"}'
+```
+
+The backend sends the current user's active categories and tags to the model so
+the model can return amount, date, category, tags, note, and clarification
+status. If a selected OpenRouter model does not support strict structured output,
+the backend retries once with a plain JSON prompt.
+
 ## Backend Auth
 
 Create the first root admin through the seed command, not through a public API:
