@@ -22,15 +22,15 @@ export function DesktopSidebar({
   );
 
   return (
-    <aside className="hidden w-[278px] shrink-0 flex-col bg-[#eee5dc] px-8 py-10 md:flex xl:w-[300px] xl:px-10">
-      <div className="flex items-center gap-3">
+    <aside className="hidden min-h-0 w-[278px] shrink-0 flex-col bg-[#eee5dc] px-8 py-8 md:flex xl:w-[300px] xl:px-10">
+      <div className="flex shrink-0 items-center gap-3">
         <div className="grid size-10 place-items-center rounded-md bg-[#f36f4e] text-white shadow-lg shadow-[#d98066]/30">
           <WalletCards size={21} />
         </div>
         <p className="text-xl font-bold text-zinc-950">SpendWise</p>
       </div>
 
-      <div className="mt-12 flex flex-col items-center text-center">
+      <div className="mt-10 flex shrink-0 flex-col items-center text-center">
         <div className="grid size-20 place-items-center rounded-full bg-[#efa482] text-2xl font-bold text-white shadow-xl shadow-[#d98b6c]/30">
           {getInitials(user)}
         </div>
@@ -40,7 +40,7 @@ export function DesktopSidebar({
         </p>
       </div>
 
-      <nav className="mt-16 flex flex-1 flex-col gap-2">
+      <nav className="mt-10 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
         {items.map((item) => (
           <NavLink
             className="group relative flex items-center gap-3 rounded-md px-4 py-3 text-sm font-semibold text-zinc-500 transition hover:text-zinc-950"
@@ -69,7 +69,7 @@ export function DesktopSidebar({
       </nav>
 
       <button
-        className="mt-10 flex w-fit items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-white hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 flex w-fit shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-white hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isLoggingOut}
         onClick={onLogout}
         type="button"
