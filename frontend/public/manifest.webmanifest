@@ -2,7 +2,7 @@
   "name": "SpendWise",
   "short_name": "SpendWise",
   "description": "Track expenses, reports, tags, and AI-assisted voice entries.",
-  "start_url": "/home",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#fbfaf7",
