@@ -120,24 +120,75 @@ the model can return amount, date, category, tags, note, and clarification
 status. If a selected OpenRouter model does not support strict structured output,
 the backend retries once with a plain JSON prompt.
 
-## Backend Auth
+## Root Admin Setup
 
-Create the first root admin through the seed command, not through a public API:
+The first admin user is created through a seed script. There is no public
+registration route for root admin creation.
+
+1. Set these backend environment variables in `backend/.env` for local
+   development, or in Render environment variables for production:
+
+```env
+ROOT_ADMIN_USERNAME=rootadmin
+ROOT_ADMIN_EMAIL=rootadmin@example.com
+ROOT_ADMIN_PASSWORD=change-this-root-password
+ROOT_ADMIN_FIRST_NAME=Root
+ROOT_ADMIN_LAST_NAME=User
+```
+
+`ROOT_ADMIN_PASSWORD` must be at least 12 characters.
+
+2. Make sure the backend also has a valid database connection:
+
+```env
+MONGO_URI=mongodb://mongo:27017/m_track
+```
+
+For MongoDB Atlas, use the Atlas connection string instead.
+
+3. Start the backend container setup if it is not already running:
+
+```bash
+docker compose up -d --build backend
+```
+
+4. Run the local root-admin seed command:
 
 ```bash
 docker compose exec backend npm run seed:root-admin
 ```
 
-In Render, run the same command after setting the `ROOT_ADMIN_*` environment
-variables and `MONGO_URI` to your MongoDB Atlas connection string.
+The script creates exactly one root admin. It is safe to run again; if a root
+admin already exists, it logs that the user already exists and does not create a
+second root admin.
 
-Login is available at:
+For Render, set the same `ROOT_ADMIN_*` variables and `MONGO_URI`, then run this
+command from the deployed backend service shell or a one-off job:
+
+```bash
+npm run seed:root-admin:prod
+```
+
+If the Render service root is the repository root instead of the `backend`
+folder, run:
+
+```bash
+cd backend && npm run seed:root-admin:prod
+```
+
+5. Log in with the seeded root admin:
 
 ```bash
 curl -X POST http://localhost:3000/api/login \
   -H "Content-Type: application/json" \
   -d '{"username":"rootadmin","password":"change-this-root-password"}'
 ```
+
+Do not create the root admin manually in MongoDB unless you also hash the
+password correctly. The seed script handles password hashing and required role
+flags.
+
+## Backend Auth
 
 Auth transport is configurable:
 
