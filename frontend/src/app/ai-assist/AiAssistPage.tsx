@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
+  CalendarDays,
   Check,
+  ChevronDown,
   Loader2,
   Mic,
   MicOff,
+  Pencil,
   ReceiptText,
   Send,
   Sparkles,
@@ -105,6 +108,8 @@ function AiAssistPage() {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [pendingText, setPendingText] = useState('');
+  const [isEditingPendingText, setIsEditingPendingText] = useState(false);
+  const [categories, setCategories] = useState<AiAssistDraftCategory[]>([]);
   const [currentDraft, setCurrentDraft] = useState<AiAssistExpenseDraft | null>(
     null,
   );
@@ -136,6 +141,31 @@ function AiAssistPage() {
     },
     [],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCategories() {
+      try {
+        const response = await apiFetch('/categories', {
+          signal: controller.signal,
+        });
+        const data = await readApiBody(response);
+
+        if (!controller.signal.aborted && response.ok && Array.isArray(data)) {
+          setCategories(data as AiAssistDraftCategory[]);
+        }
+      } catch {
+        // Saving an AI draft still works with its original category if options cannot load.
+      }
+    }
+
+    void loadCategories();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   function addAssistantMessage(text: string) {
     setMessages((currentMessages) => [
@@ -178,6 +208,7 @@ function AiAssistPage() {
 
       if (transcript) {
         setPendingText(transcript);
+        setIsEditingPendingText(false);
       }
 
       setIsRecording(false);
@@ -225,6 +256,7 @@ function AiAssistPage() {
 
     setMessages((currentMessages) => [...currentMessages, userMessage]);
     setPendingText('');
+    setIsEditingPendingText(false);
     setIsSending(true);
     setPageError('');
 
@@ -277,7 +309,17 @@ function AiAssistPage() {
     recognitionRef.current = null;
     setIsFinalizingSpeech(false);
     setIsRecording(false);
+    setIsEditingPendingText(false);
     setPendingText('');
+  }
+
+  function handleDraftChange(messageId: string, nextDraft: AiAssistExpenseDraft) {
+    setMessages((currentMessages) =>
+      currentMessages.map((message) =>
+        message.id === messageId ? { ...message, draft: nextDraft } : message,
+      ),
+    );
+    setCurrentDraft(nextDraft);
   }
 
   async function handleSaveDraft(message: ChatMessage) {
@@ -405,9 +447,13 @@ function AiAssistPage() {
 
                   {message.draft ? (
                     <ExpenseDraftCard
+                      categories={categories}
                       draft={message.draft}
                       isSaved={savedDraftIds.includes(message.id)}
                       isSaving={savingDraftId === message.id}
+                      onChange={(nextDraft) =>
+                        handleDraftChange(message.id, nextDraft)
+                      }
                       onSave={() => handleSaveDraft(message)}
                     />
                   ) : null}
@@ -428,10 +474,31 @@ function AiAssistPage() {
           <div className="shrink-0 border-t border-[#e0f1ee] bg-white px-4 py-3 sm:px-6 sm:py-4">
             {pendingText ? (
               <div className="flex flex-col gap-3 rounded-md border border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-600">
-                  {pendingText}
-                </p>
+                {isEditingPendingText ? (
+                  <textarea
+                    aria-label="Edit voice text"
+                    className="min-h-16 w-full flex-1 resize-none rounded-md border border-[#f36f4e]/40 bg-white px-2.5 py-2 text-xs font-semibold leading-5 text-zinc-700 outline-none focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
+                    onChange={(event) => setPendingText(event.target.value)}
+                    value={pendingText}
+                  />
+                ) : (
+                  <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-600">
+                    {pendingText}
+                  </p>
+                )}
                 <div className="flex shrink-0 items-center justify-end gap-2">
+                  <button
+                    aria-label={
+                      isEditingPendingText ? 'Finish editing voice text' : 'Edit voice text'
+                    }
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-500 transition hover:border-[#66bfb6] hover:text-[#287d74] disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSending}
+                    onClick={() => setIsEditingPendingText((isEditing) => !isEditing)}
+                    type="button"
+                  >
+                    {isEditingPendingText ? <Check size={13} /> : <Pencil size={13} />}
+                    {isEditingPendingText ? 'Done' : 'Edit'}
+                  </button>
                   <button
                     aria-label="Clear voice text"
                     className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
@@ -514,16 +581,22 @@ function AiAssistPage() {
 }
 
 function ExpenseDraftCard({
+  categories,
   draft,
   isSaved,
   isSaving,
+  onChange,
   onSave,
 }: {
+  categories: AiAssistDraftCategory[];
   draft: AiAssistExpenseDraft;
   isSaved: boolean;
   isSaving: boolean;
+  onChange: (draft: AiAssistExpenseDraft) => void;
   onSave: () => void;
 }) {
+  const isLocked = isSaved || isSaving;
+
   return (
     <div className="mt-4 rounded-lg border border-[#bfe7e2] bg-white p-4 text-zinc-950 shadow-[0_0_28px_rgba(102,191,182,0.22)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -553,8 +626,17 @@ function ExpenseDraftCard({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <DraftField label="Category" value={draft.category.name} />
-        <DraftField label="Date" value={draft.date} />
+        <EditableCategoryField
+          categories={categories}
+          disabled={isLocked}
+          draft={draft}
+          onChange={onChange}
+        />
+        <EditableDateField
+          disabled={isLocked}
+          draft={draft}
+          onChange={onChange}
+        />
         <DraftField
           label="Tags"
           value={
@@ -563,12 +645,7 @@ function ExpenseDraftCard({
         />
       </div>
 
-      <div className="mt-3 rounded-md bg-[#fbfaf7] px-3 py-2">
-        <p className="text-[11px] font-bold uppercase text-zinc-400">Note</p>
-        <p className="mt-1 break-words text-sm font-semibold text-zinc-700">
-          {draft.note || 'No note'}
-        </p>
-      </div>
+      <EditableNoteField disabled={isLocked} draft={draft} onChange={onChange} />
     </div>
   );
 }
@@ -581,6 +658,176 @@ function DraftField({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
+  );
+}
+
+function EditableCategoryField({
+  categories,
+  disabled,
+  draft,
+  onChange,
+}: {
+  categories: AiAssistDraftCategory[];
+  disabled: boolean;
+  draft: AiAssistExpenseDraft;
+  onChange: (draft: AiAssistExpenseDraft) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const categoryOptions = categories.some(
+    (category) => category.id === draft.category.id,
+  )
+    ? categories
+    : [draft.category, ...categories];
+
+  if (isEditing && !disabled) {
+    return (
+      <label className="rounded-md bg-[#fbfaf7] px-3 py-2">
+        <span className="text-[11px] font-bold uppercase text-zinc-400">Category</span>
+        <span className="mt-1 flex items-center gap-1.5">
+          <select
+            aria-label="Select expense category"
+            autoFocus
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold text-zinc-800 outline-none"
+            onBlur={() => setIsEditing(false)}
+            onChange={(event) => {
+              const category = categoryOptions.find(
+                (option) => option.id === event.target.value,
+              );
+
+              if (category) {
+                onChange({ ...draft, category });
+              }
+
+              setIsEditing(false);
+            }}
+            value={draft.category.id}
+          >
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="shrink-0 text-zinc-400" size={14} />
+        </span>
+      </label>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Change expense category"
+      className="group rounded-md bg-[#fbfaf7] px-3 py-2 text-left transition hover:bg-[#f0faf8] disabled:cursor-default"
+      disabled={disabled}
+      onClick={() => setIsEditing(true)}
+      type="button"
+    >
+      <span className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase text-zinc-400">
+        Category
+        {!disabled ? <Pencil className="text-zinc-400" size={12} /> : null}
+      </span>
+      <span className="mt-1 block truncate text-sm font-bold text-zinc-800" title={draft.category.name}>
+        {draft.category.name}
+      </span>
+    </button>
+  );
+}
+
+function EditableDateField({
+  disabled,
+  draft,
+  onChange,
+}: {
+  disabled: boolean;
+  draft: AiAssistExpenseDraft;
+  onChange: (draft: AiAssistExpenseDraft) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (isEditing && !disabled) {
+    return (
+      <label className="rounded-md bg-[#fbfaf7] px-3 py-2">
+        <span className="text-[11px] font-bold uppercase text-zinc-400">Date</span>
+        <span className="mt-1 flex items-center gap-1.5">
+          <CalendarDays className="shrink-0 text-zinc-400" size={14} />
+          <input
+            aria-label="Change expense date"
+            autoFocus
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold text-zinc-800 outline-none"
+            onBlur={() => setIsEditing(false)}
+            onChange={(event) => onChange({ ...draft, date: event.target.value })}
+            type="date"
+            value={draft.date}
+          />
+        </span>
+      </label>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Change expense date"
+      className="group rounded-md bg-[#fbfaf7] px-3 py-2 text-left transition hover:bg-[#f0faf8] disabled:cursor-default"
+      disabled={disabled}
+      onClick={() => setIsEditing(true)}
+      type="button"
+    >
+      <span className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase text-zinc-400">
+        Date
+        {!disabled ? <Pencil className="text-zinc-400" size={12} /> : null}
+      </span>
+      <span className="mt-1 block truncate text-sm font-bold text-zinc-800" title={draft.date}>
+        {draft.date}
+      </span>
+    </button>
+  );
+}
+
+function EditableNoteField({
+  disabled,
+  draft,
+  onChange,
+}: {
+  disabled: boolean;
+  draft: AiAssistExpenseDraft;
+  onChange: (draft: AiAssistExpenseDraft) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (isEditing && !disabled) {
+    return (
+      <label className="mt-3 block rounded-md bg-[#fbfaf7] px-3 py-2">
+        <span className="text-[11px] font-bold uppercase text-zinc-400">Note</span>
+        <textarea
+          aria-label="Edit expense note"
+          autoFocus
+          className="mt-1 min-h-16 w-full resize-none bg-transparent text-sm font-semibold text-zinc-700 outline-none placeholder:text-zinc-400"
+          maxLength={500}
+          onBlur={() => setIsEditing(false)}
+          onChange={(event) => onChange({ ...draft, note: event.target.value })}
+          placeholder="Add a note"
+          value={draft.note ?? ''}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Edit expense note"
+      className="group mt-3 block w-full rounded-md bg-[#fbfaf7] px-3 py-2 text-left transition hover:bg-[#f0faf8] disabled:cursor-default"
+      disabled={disabled}
+      onClick={() => setIsEditing(true)}
+      type="button"
+    >
+      <span className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase text-zinc-400">
+        Note
+        {!disabled ? <Pencil className="text-zinc-400" size={12} /> : null}
+      </span>
+      <span className="mt-1 block break-words text-sm font-semibold text-zinc-700">
+        {draft.note || 'Tap to add a note'}
+      </span>
+    </button>
   );
 }
 
