@@ -18,7 +18,11 @@ import {
   getApiErrorMessage,
   readApiBody,
 } from '../../shared/api/api-client';
-import { formatInr } from '../../shared/utils/money';
+import {
+  formatInr,
+  normalizeInrInput,
+  parseInrToPaise,
+} from '../../shared/utils/money';
 
 interface BrowserSpeechRecognitionAlternative {
   transcript: string;
@@ -110,6 +114,7 @@ function AiAssistPage() {
   const [pendingText, setPendingText] = useState('');
   const [isEditingPendingText, setIsEditingPendingText] = useState(false);
   const [categories, setCategories] = useState<AiAssistDraftCategory[]>([]);
+  const [tags, setTags] = useState<AiAssistDraftTag[]>([]);
   const [currentDraft, setCurrentDraft] = useState<AiAssistExpenseDraft | null>(
     null,
   );
@@ -121,18 +126,20 @@ function AiAssistPage() {
   const [pageError, setPageError] = useState('');
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end',
+    const chat = chatEndRef.current;
+
+    if (!chat) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      chat.scrollTo({ behavior: 'smooth', top: chat.scrollHeight });
     });
-  }, [
-    messages,
-    pendingText,
-    isFinalizingSpeech,
-    isRecording,
-    isSending,
-    savingDraftId,
-  ]);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isSending, messages.length]);
 
   useEffect(
     () => () => {
@@ -147,16 +154,28 @@ function AiAssistPage() {
 
     async function loadCategories() {
       try {
-        const response = await apiFetch('/categories', {
-          signal: controller.signal,
-        });
-        const data = await readApiBody(response);
+        const [categoriesResponse, tagsResponse] = await Promise.all([
+          apiFetch('/categories', { signal: controller.signal }),
+          apiFetch('/tags', { signal: controller.signal }),
+        ]);
+        const [categoriesData, tagsData] = await Promise.all([
+          readApiBody(categoriesResponse),
+          readApiBody(tagsResponse),
+        ]);
 
-        if (!controller.signal.aborted && response.ok && Array.isArray(data)) {
-          setCategories(data as AiAssistDraftCategory[]);
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (categoriesResponse.ok && Array.isArray(categoriesData)) {
+          setCategories(categoriesData as AiAssistDraftCategory[]);
+        }
+
+        if (tagsResponse.ok && Array.isArray(tagsData)) {
+          setTags(tagsData as AiAssistDraftTag[]);
         }
       } catch {
-        // Saving an AI draft still works with its original category if options cannot load.
+        // Saving an AI draft still works if selectable categories or tags cannot load.
       }
     }
 
@@ -397,7 +416,7 @@ function AiAssistPage() {
       >
         <div className="pointer-events-none absolute -inset-6 -z-10 animate-[spin_14s_linear_infinite] rounded-[2rem] bg-[conic-gradient(from_90deg,#ef4444,#22c55e,#3b82f6,#f97316,#ef4444)] opacity-90 blur-2xl" />
         <div className="pointer-events-none absolute -inset-2 -z-10 rounded-xl bg-[linear-gradient(120deg,rgba(239,68,68,0.45),rgba(34,197,94,0.42),rgba(59,130,246,0.45),rgba(249,115,22,0.4))] blur-lg" />
-        <div className="relative flex h-[calc(100dvh-22rem)] min-h-[360px] flex-col overflow-hidden rounded-lg bg-white sm:h-[min(680px,calc(100dvh-15rem))] sm:min-h-[520px]">
+        <div className="relative flex h-[clamp(18rem,calc(100dvh-22rem),42rem)] flex-col overflow-hidden rounded-lg bg-white sm:h-[min(680px,calc(100dvh-15rem))] sm:min-h-[520px]">
           <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#66bfb6] to-transparent" />
           <div className="shrink-0 border-b border-[#e0f1ee] bg-[#f5fbfa] px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex items-center justify-between gap-4">
@@ -415,7 +434,10 @@ function AiAssistPage() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:space-y-4 sm:px-6 sm:py-5">
+          <div
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-4 sm:px-6 sm:py-5"
+            ref={chatEndRef}
+          >
             {messages.map((message) => (
               <div
                 className={`flex ${
@@ -451,6 +473,7 @@ function AiAssistPage() {
                       draft={message.draft}
                       isSaved={savedDraftIds.includes(message.id)}
                       isSaving={savingDraftId === message.id}
+                      tags={tags}
                       onChange={(nextDraft) =>
                         handleDraftChange(message.id, nextDraft)
                       }
@@ -468,7 +491,6 @@ function AiAssistPage() {
                 </div>
               </div>
             ) : null}
-            <div ref={chatEndRef} />
           </div>
 
           <div className="shrink-0 border-t border-[#e0f1ee] bg-white px-4 py-3 sm:px-6 sm:py-4">
@@ -479,6 +501,7 @@ function AiAssistPage() {
                     aria-label="Edit voice text"
                     className="min-h-16 w-full flex-1 resize-none rounded-md border border-[#f36f4e]/40 bg-white px-2.5 py-2 text-xs font-semibold leading-5 text-zinc-700 outline-none focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
                     onChange={(event) => setPendingText(event.target.value)}
+                    onFocus={(event) => keepFocusedControlVisible(event.currentTarget)}
                     value={pendingText}
                   />
                 ) : (
@@ -585,6 +608,7 @@ function ExpenseDraftCard({
   draft,
   isSaved,
   isSaving,
+  tags,
   onChange,
   onSave,
 }: {
@@ -592,6 +616,7 @@ function ExpenseDraftCard({
   draft: AiAssistExpenseDraft;
   isSaved: boolean;
   isSaving: boolean;
+  tags: AiAssistDraftTag[];
   onChange: (draft: AiAssistExpenseDraft) => void;
   onSave: () => void;
 }) {
@@ -605,9 +630,11 @@ function ExpenseDraftCard({
             <ReceiptText size={14} />
             Expense draft
           </p>
-          <p className="mt-2 text-3xl font-extrabold text-zinc-950">
-            {formatInr(draft.amountPaise)}
-          </p>
+          <EditableAmountField
+            disabled={isLocked}
+            draft={draft}
+            onChange={onChange}
+          />
         </div>
 
         <button
@@ -637,11 +664,11 @@ function ExpenseDraftCard({
           draft={draft}
           onChange={onChange}
         />
-        <DraftField
-          label="Tags"
-          value={
-            draft.tags.length ? draft.tags.map((tag) => tag.name).join(', ') : 'None'
-          }
+        <EditableTagsField
+          disabled={isLocked}
+          draft={draft}
+          onChange={onChange}
+          tags={tags}
         />
       </div>
 
@@ -650,14 +677,186 @@ function ExpenseDraftCard({
   );
 }
 
-function DraftField({ label, value }: { label: string; value: string }) {
+function EditableAmountField({
+  disabled,
+  draft,
+  onChange,
+}: {
+  disabled: boolean;
+  draft: AiAssistExpenseDraft;
+  onChange: (draft: AiAssistExpenseDraft) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [amountInput, setAmountInput] = useState(() =>
+    formatAmountInput(draft.amountPaise),
+  );
+
+  useEffect(() => {
+    if (!isEditing) {
+      setAmountInput(formatAmountInput(draft.amountPaise));
+    }
+  }, [draft.amountPaise, isEditing]);
+
+  function finishEditing() {
+    const amountPaise = parseInrToPaise(amountInput);
+
+    if (amountPaise) {
+      onChange({ ...draft, amountPaise });
+      setAmountInput(formatAmountInput(amountPaise));
+    } else {
+      setAmountInput(formatAmountInput(draft.amountPaise));
+    }
+
+    setIsEditing(false);
+  }
+
+  if (isEditing && !disabled) {
+    return (
+      <div className="mt-2 flex items-center gap-2 rounded-md border border-[#66bfb6]/45 bg-[#f5fbfa] px-2.5 py-1.5">
+        <span className="text-lg font-extrabold text-[#287d74]">Rs.</span>
+        <input
+          aria-label="Edit expense amount"
+          autoFocus
+          className="min-w-0 flex-1 bg-transparent text-2xl font-extrabold text-zinc-950 outline-none"
+          inputMode="decimal"
+          onBlur={finishEditing}
+          onChange={(event) => {
+            const nextAmount = normalizeInrInput(event.target.value);
+            setAmountInput(nextAmount);
+
+            const amountPaise = parseInrToPaise(nextAmount);
+
+            if (amountPaise) {
+              onChange({ ...draft, amountPaise });
+            }
+          }}
+          onFocus={(event) => keepFocusedControlVisible(event.currentTarget)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            }
+          }}
+          pattern="\\d+(\\.\\d{0,2})?"
+          type="text"
+          value={amountInput}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-md bg-[#fbfaf7] px-3 py-2">
-      <p className="text-[11px] font-bold uppercase text-zinc-400">{label}</p>
-      <p className="mt-1 truncate text-sm font-bold text-zinc-800" title={value}>
-        {value}
-      </p>
-    </div>
+    <button
+      aria-label="Change expense amount"
+      className="group mt-2 inline-flex items-center gap-2 rounded-md text-left transition hover:text-[#287d74] disabled:cursor-default"
+      disabled={disabled}
+      onClick={() => setIsEditing(true)}
+      type="button"
+    >
+      <span className="text-3xl font-extrabold text-zinc-950">
+        {formatInr(draft.amountPaise)}
+      </span>
+      {!disabled ? <Pencil className="text-zinc-400" size={14} /> : null}
+    </button>
+  );
+}
+
+function EditableTagsField({
+  disabled,
+  draft,
+  onChange,
+  tags,
+}: {
+  disabled: boolean;
+  draft: AiAssistExpenseDraft;
+  onChange: (draft: AiAssistExpenseDraft) => void;
+  tags: AiAssistDraftTag[];
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const tagOptions = [
+    ...draft.tags,
+    ...tags.filter(
+      (tag) => !draft.tags.some((selectedTag) => selectedTag.id === tag.id),
+    ),
+  ];
+
+  function toggleTag(tag: AiAssistDraftTag) {
+    const isSelected = draft.tags.some((selectedTag) => selectedTag.id === tag.id);
+
+    onChange({
+      ...draft,
+      tags: isSelected
+        ? draft.tags.filter((selectedTag) => selectedTag.id !== tag.id)
+        : [...draft.tags, tag],
+    });
+  }
+
+  if (isEditing && !disabled) {
+    return (
+      <div className="rounded-md bg-[#fbfaf7] px-3 py-2 sm:col-span-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase text-zinc-400">Tags</p>
+          <button
+            className="text-[11px] font-bold text-[#287d74]"
+            onClick={() => setIsEditing(false)}
+            type="button"
+          >
+            Done
+          </button>
+        </div>
+        {tagOptions.length ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tagOptions.map((tag) => {
+              const isSelected = draft.tags.some(
+                (selectedTag) => selectedTag.id === tag.id,
+              );
+
+              return (
+                <button
+                  className={[
+                    'inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold leading-none transition',
+                    isSelected
+                      ? 'border-[#66bfb6] bg-[#66bfb6] text-white'
+                      : 'border-[#eadfd5] bg-white text-zinc-600 hover:border-[#66bfb6] hover:text-[#287d74]',
+                  ].join(' ')}
+                  key={tag.id}
+                  onClick={() => toggleTag(tag)}
+                  type="button"
+                >
+                  {isSelected ? <Check size={10} /> : null}
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs font-medium text-zinc-500">
+            No saved tags are available yet.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const tagSummary = draft.tags.length
+    ? draft.tags.map((tag) => tag.name).join(', ')
+    : 'None';
+
+  return (
+    <button
+      aria-label="Change expense tags"
+      className="group rounded-md bg-[#fbfaf7] px-3 py-2 text-left transition hover:bg-[#f0faf8] disabled:cursor-default"
+      disabled={disabled}
+      onClick={() => setIsEditing(true)}
+      type="button"
+    >
+      <span className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase text-zinc-400">
+        Tags
+        {!disabled ? <Pencil className="text-zinc-400" size={12} /> : null}
+      </span>
+      <span className="mt-1 block truncate text-sm font-bold text-zinc-800" title={tagSummary}>
+        {tagSummary}
+      </span>
+    </button>
   );
 }
 
@@ -756,6 +955,7 @@ function EditableDateField({
             className="min-w-0 flex-1 bg-transparent text-sm font-bold text-zinc-800 outline-none"
             onBlur={() => setIsEditing(false)}
             onChange={(event) => onChange({ ...draft, date: event.target.value })}
+            onFocus={(event) => keepFocusedControlVisible(event.currentTarget)}
             type="date"
             value={draft.date}
           />
@@ -805,6 +1005,7 @@ function EditableNoteField({
           maxLength={500}
           onBlur={() => setIsEditing(false)}
           onChange={(event) => onChange({ ...draft, note: event.target.value })}
+          onFocus={(event) => keepFocusedControlVisible(event.currentTarget)}
           placeholder="Add a note"
           value={draft.note ?? ''}
         />
@@ -942,6 +1143,23 @@ function getLocalDate() {
   const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
 
   return localDate.toISOString().slice(0, 10);
+}
+
+function formatAmountInput(amountPaise: number) {
+  const rupees = Math.floor(amountPaise / 100);
+  const paise = amountPaise % 100;
+
+  return paise ? `${rupees}.${String(paise).padStart(2, '0')}` : String(rupees);
+}
+
+function keepFocusedControlVisible(control: HTMLElement) {
+  window.setTimeout(() => {
+    control.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest',
+    });
+  }, 180);
 }
 
 function createId() {
