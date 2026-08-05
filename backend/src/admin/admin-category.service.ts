@@ -201,7 +201,7 @@ export class AdminCategoryService {
   ): asserts normalizedName is ExpenseCategoryKey {
     if (!isExpenseCategoryKey(normalizedName)) {
       throw new BadRequestException(
-        'Category must be one of needs, wants, emis, extra, or invest',
+        'Category must be one of needs, wants, emis, extra, invest, or rent',
       );
     }
   }

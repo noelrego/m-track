@@ -4,4 +4,5 @@ export enum ExpenseCategoryKey {
   Emis = 'emis',
   Extra = 'extra',
   Invest = 'invest',
+  Rent = 'rent',
 }

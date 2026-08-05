@@ -21,6 +21,7 @@ interface AddExpenseModalProps {
 const categoryOrder = [
   ExpenseCategoryKey.Needs,
   ExpenseCategoryKey.Wants,
+  ExpenseCategoryKey.Rent,
   ExpenseCategoryKey.Emis,
   ExpenseCategoryKey.Extra,
   ExpenseCategoryKey.Invest,

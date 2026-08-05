@@ -61,6 +61,12 @@ const categoryStyles: Record<
     label: 'Wants',
     text: 'text-[#9a6510]',
   },
+  [ExpenseCategoryKey.Rent]: {
+    accent: 'bg-[#2f6fed]',
+    bg: 'bg-[#edf4ff]',
+    label: 'Rent',
+    text: 'text-[#1f55b8]',
+  },
   [ExpenseCategoryKey.Emis]: {
     accent: 'bg-[#8d78d6]',
     bg: 'bg-[#f1effb]',

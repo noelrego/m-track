@@ -14,6 +14,7 @@ const categoryColors: Record<ExpenseCategoryKey, string> = {
   [ExpenseCategoryKey.Emis]: '#8d78d6',
   [ExpenseCategoryKey.Extra]: '#f36f4e',
   [ExpenseCategoryKey.Invest]: '#242424',
+  [ExpenseCategoryKey.Rent]: '#2f6fed',
 };
 
 export function CategoryExpenseLineChart({

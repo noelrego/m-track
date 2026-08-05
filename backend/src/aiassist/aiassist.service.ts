@@ -373,7 +373,7 @@ export class AiAssistService {
       'Return exactly one valid JSON object and nothing else.',
       'Do not wrap the JSON in markdown fences.',
       'The JSON object must have these keys and types:',
-      '{"amountPaise": number, "categoryKey": "needs"|"wants"|"emis"|"extra"|"invest"|"unknown", "confidence": number, "date": "YYYY-MM-DD", "missingFields": string[], "note": string, "replyText": string, "tagNames": string[]}',
+      '{"amountPaise": number, "categoryKey": "needs"|"wants"|"emis"|"extra"|"invest"|"rent"|"unknown", "confidence": number, "date": "YYYY-MM-DD", "missingFields": string[], "note": string, "replyText": string, "tagNames": string[]}',
     ].join(' ');
   }
 

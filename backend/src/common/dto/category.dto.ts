@@ -22,7 +22,7 @@ export class CreateCategoryDto {
     minLength: 2,
     maxLength: 60,
     description:
-      'Static category display name. Normalized value must be one of needs, wants, emis, extra, or invest.',
+      'Static category display name. Normalized value must be one of needs, wants, emis, extra, invest, or rent.',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

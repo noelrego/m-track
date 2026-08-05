@@ -4,6 +4,7 @@ export enum ExpenseCategoryKey {
   Emis = 'emis',
   Extra = 'extra',
   Invest = 'invest',
+  Rent = 'rent',
 }
 
 export const EXPENSE_CATEGORY_KEYS = Object.values(ExpenseCategoryKey);

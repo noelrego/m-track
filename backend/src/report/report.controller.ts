@@ -107,7 +107,7 @@ export class ReportController {
   @ApiOperation({
     summary: 'Get recent monthly expense totals by category',
     description:
-      'Returns the last 5, 8, or 12 UTC months with a monthly total series for each static category. Defaults to the last 5 months.',
+      'Returns the last 5, 8, or 12 UTC months with monthly total series for Needs, Wants, EMIs, Extra, and Invest. Rent is excluded from this category graph. Defaults to the last 5 months.',
   })
   @ApiOkResponse({
     description: 'Monthly category expense trends returned successfully.',

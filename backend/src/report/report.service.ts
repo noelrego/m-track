@@ -98,6 +98,13 @@ const CHART_CATEGORY_KEYS = [
   ExpenseCategoryKey.Wants,
   ExpenseCategoryKey.Extra,
 ];
+const MONTHLY_CATEGORY_TREND_KEYS = [
+  ExpenseCategoryKey.Needs,
+  ExpenseCategoryKey.Wants,
+  ExpenseCategoryKey.Emis,
+  ExpenseCategoryKey.Extra,
+  ExpenseCategoryKey.Invest,
+];
 const MONTHLY_EXPENSE_MONTH_COUNTS = [5, 8, 12];
 const DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT = 5;
 
@@ -107,6 +114,7 @@ const CATEGORY_LABELS: Record<ExpenseCategoryKey, string> = {
   [ExpenseCategoryKey.Emis]: 'EMIs',
   [ExpenseCategoryKey.Extra]: 'Extra',
   [ExpenseCategoryKey.Invest]: 'Invest',
+  [ExpenseCategoryKey.Rent]: 'Rent',
 };
 
 @Injectable()
@@ -363,7 +371,10 @@ export class ReportService {
 
     try {
       const categories = await this.loadStaticCategories();
-      const categoryIds = this.getCategoryIds(categories, ALL_CATEGORY_KEYS);
+      const categoryIds = this.getCategoryIds(
+        categories,
+        MONTHLY_CATEGORY_TREND_KEYS,
+      );
       const aggregateMap = categoryIds.length
         ? await this.aggregateByCategoryAndMonth(
             ownerUserId,
@@ -384,7 +395,7 @@ export class ReportService {
         startDate: monthTrendRange.startDate,
         endDate: monthTrendRange.endDate,
         months,
-        categories: ALL_CATEGORY_KEYS.map((categoryKey) => {
+        categories: MONTHLY_CATEGORY_TREND_KEYS.map((categoryKey) => {
           const category = categories.byKey.get(categoryKey);
 
           return {
