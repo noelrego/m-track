@@ -45,6 +45,7 @@ interface BrowserSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  maxAlternatives: number;
   onend: (() => void) | null;
   onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
   onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
@@ -108,6 +109,7 @@ function AiAssistPage() {
     null,
   );
   const [isRecording, setIsRecording] = useState(false);
+  const [isFinalizingSpeech, setIsFinalizingSpeech] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [savingDraftId, setSavingDraftId] = useState<string | null>(null);
   const [savedDraftIds, setSavedDraftIds] = useState<string[]>([]);
@@ -118,7 +120,22 @@ function AiAssistPage() {
       behavior: 'smooth',
       block: 'end',
     });
-  }, [messages, pendingText, isSending, savingDraftId]);
+  }, [
+    messages,
+    pendingText,
+    isFinalizingSpeech,
+    isRecording,
+    isSending,
+    savingDraftId,
+  ]);
+
+  useEffect(
+    () => () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    },
+    [],
+  );
 
   function addAssistantMessage(text: string) {
     setMessages((currentMessages) => [
@@ -135,6 +152,7 @@ function AiAssistPage() {
     if (isRecording) {
       recognitionRef.current?.stop();
       setIsRecording(false);
+      setIsFinalizingSpeech(true);
       return;
     }
 
@@ -146,22 +164,29 @@ function AiAssistPage() {
     }
 
     setPageError('');
+    setIsFinalizingSpeech(false);
+
+    recognitionRef.current?.abort();
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.interimResults = false;
     recognition.lang = 'en-IN';
+    recognition.maxAlternatives = 1;
     recognition.onresult = (event) => {
-      let transcript = '';
+      const transcript = getFinalTranscript(event);
 
-      for (let index = 0; index < event.results.length; index += 1) {
-        transcript += event.results[index][0]?.transcript ?? '';
+      if (transcript) {
+        setPendingText(transcript);
       }
 
-      setPendingText(transcript.trim());
+      setIsRecording(false);
+      setIsFinalizingSpeech(false);
     };
     recognition.onerror = (event) => {
       setIsRecording(false);
+      setIsFinalizingSpeech(false);
+      recognitionRef.current = null;
       setPageError(
         event.error
           ? `Voice capture stopped: ${event.error}.`
@@ -170,6 +195,8 @@ function AiAssistPage() {
     };
     recognition.onend = () => {
       setIsRecording(false);
+      setIsFinalizingSpeech(false);
+      recognitionRef.current = null;
     };
 
     recognitionRef.current = recognition;
@@ -243,6 +270,14 @@ function AiAssistPage() {
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handleClearPendingText() {
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setIsFinalizingSpeech(false);
+    setIsRecording(false);
+    setPendingText('');
   }
 
   async function handleSaveDraft(message: ChatMessage) {
@@ -390,40 +425,18 @@ function AiAssistPage() {
             <div ref={chatEndRef} />
           </div>
 
-          <div className="relative shrink-0 border-t border-[#e0f1ee] bg-white px-4 pb-3 pt-8 sm:px-6 sm:pb-4 sm:pt-10">
-            <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-              <button
-                aria-pressed={isRecording}
-                className={`relative grid size-14 place-items-center rounded-full text-white shadow-2xl transition sm:size-16 ${
-                  isRecording
-                    ? 'animate-pulse bg-[#f36f4e] shadow-[#f36f4e]/45'
-                    : 'bg-[#242424] shadow-zinc-950/25 hover:bg-zinc-800'
-                }`}
-                onClick={handleMicClick}
-                type="button"
-              >
-                {isRecording ? (
-                  <>
-                    <span className="absolute inset-0 animate-ping rounded-full bg-[#f36f4e]/35" />
-                    <span className="absolute -inset-3 animate-pulse rounded-full border border-[#f36f4e]/35" />
-                    <MicOff className="relative" size={22} />
-                  </>
-                ) : (
-                  <Mic size={22} />
-                )}
-              </button>
-            </div>
+          <div className="shrink-0 border-t border-[#e0f1ee] bg-white px-4 py-3 sm:px-6 sm:py-4">
             {pendingText ? (
-              <div className="flex flex-col gap-2 rounded-md border border-[#eadfd5] bg-[#fbfaf7] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="min-w-0 text-xs font-semibold leading-5 text-zinc-600">
+              <div className="flex flex-col gap-3 rounded-md border border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-600">
                   {pendingText}
                 </p>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center justify-end gap-2">
                   <button
                     aria-label="Clear voice text"
                     className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-500 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isSending}
-                    onClick={() => setPendingText('')}
+                    onClick={handleClearPendingText}
                     type="button"
                   >
                     <X size={13} />
@@ -444,9 +457,53 @@ function AiAssistPage() {
                   </button>
                 </div>
               </div>
+            ) : isSending ? (
+              <div className="flex items-center gap-3 rounded-md border border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5">
+                <div className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-[#f36f4e]">
+                  <Loader2 className="animate-spin" size={18} />
+                </div>
+                <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-500">
+                  Preparing your expense draft...
+                </p>
+              </div>
+            ) : isFinalizingSpeech ? (
+              <div className="flex items-center gap-3 rounded-md border border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5">
+                <div className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-[#f36f4e]">
+                  <Loader2 className="animate-spin" size={18} />
+                </div>
+                <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-500">
+                  Finishing voice capture...
+                </p>
+              </div>
             ) : (
-              <div className="rounded-md border border-dashed border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5 text-center text-xs font-semibold text-zinc-500 sm:py-3">
-                Tap the mic button to speak your expense.
+              <div className="flex items-center gap-3 rounded-md border border-dashed border-[#eadfd5] bg-[#fbfaf7] px-3 py-2.5">
+                <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-zinc-500">
+                  {isRecording
+                    ? 'Listening... tap stop when you finish speaking.'
+                    : 'Tap mic and say one expense sentence.'}
+                </p>
+                <button
+                  aria-label={
+                    isRecording ? 'Stop voice capture' : 'Start voice capture'
+                  }
+                  aria-pressed={isRecording}
+                  className={`relative grid size-11 shrink-0 place-items-center rounded-full text-white shadow-xl transition ${
+                    isRecording
+                      ? 'animate-pulse bg-[#f36f4e] shadow-[#f36f4e]/40'
+                      : 'bg-[#242424] shadow-zinc-950/20 hover:bg-zinc-800'
+                  }`}
+                  onClick={handleMicClick}
+                  type="button"
+                >
+                  {isRecording ? (
+                    <>
+                      <span className="absolute inset-0 animate-ping rounded-full bg-[#f36f4e]/30" />
+                      <MicOff className="relative" size={20} />
+                    </>
+                  ) : (
+                    <Mic size={20} />
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -613,6 +670,24 @@ function getSpeechRecognitionConstructor() {
   };
 
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+}
+
+function getFinalTranscript(event: BrowserSpeechRecognitionEvent) {
+  const transcripts: string[] = [];
+
+  for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    const result = event.results[index];
+
+    if (result.isFinal) {
+      const transcript = result[0]?.transcript.trim();
+
+      if (transcript) {
+        transcripts.push(transcript);
+      }
+    }
+  }
+
+  return transcripts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 function getLocalDate() {
