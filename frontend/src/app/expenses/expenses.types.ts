@@ -19,6 +19,9 @@ export interface ExpenseItem {
   tags: ExpenseTag[];
   note?: string;
   monthKey: string;
+  emiPlanId?: string;
+  emiInstallmentNumber?: number;
+  emiInstallmentCount?: number;
   createdAt: string;
   updatedAt: string;
 }

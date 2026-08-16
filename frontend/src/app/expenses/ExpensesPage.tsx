@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Landmark,
   Loader2,
   Pencil,
   Plus,
@@ -29,6 +30,7 @@ import {
   normalizeInrInput,
   parseInrToPaise,
 } from '../../shared/utils/money';
+import { AddExpenseModal } from '../home/AddExpenseModal';
 import type {
   CategoryOption,
   ExpenseItem,
@@ -36,6 +38,13 @@ import type {
   ListExpensesResponse,
   TagOption,
 } from './expenses.types';
+import { EmiDeleteModal } from '../emis/EmiDeleteModal';
+import { EmiInstallmentModal } from '../emis/EmiInstallmentModal';
+import type {
+  EmiEditScope,
+  EmiInstallment,
+  EmiPlanDetail,
+} from '../emis/emi.types';
 
 interface ExpenseFormState {
   amount: string;
@@ -183,15 +192,22 @@ function ExpensesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null);
+  const [editingEmiPlan, setEditingEmiPlan] = useState<EmiPlanDetail | null>(null);
+  const [editingEmiInstallment, setEditingEmiInstallment] =
+    useState<EmiInstallment | null>(null);
+  const [loadingEmiExpenseId, setLoadingEmiExpenseId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ExpenseItem | null>(null);
+  const [deleteScope, setDeleteScope] = useState<EmiEditScope>('single');
   const [viewingTags, setViewingTags] = useState<ExpenseTag[] | null>(null);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(() =>
     getEmptyExpenseForm(selectedMonthKey),
   );
   const [pageError, setPageError] = useState('');
   const [formError, setFormError] = useState('');
+  const [emiModalError, setEmiModalError] = useState('');
 
   const selectedYear = Number(selectedMonthKey.slice(0, 4));
   const selectedMonth = selectedMonthKey.slice(5, 7);
@@ -291,7 +307,9 @@ function ExpensesPage() {
       }
 
       const categoryOptions = normalizeCategoryOrder([
-        ...categoriesData,
+        ...categoriesData.filter(
+          (category) => category.normalizedName !== ExpenseCategoryKey.Emis,
+        ),
         ...(expense &&
         !categoriesData.some((category) => category.id === expense.category.id)
           ? [expense.category]
@@ -331,24 +349,53 @@ function ExpensesPage() {
   }
 
   function openCreateModal() {
-    const form = getEmptyExpenseForm(selectedMonthKey);
-
-    setEditingExpense(null);
-    setExpenseForm({
-      ...form,
-      categoryId: categories[0]?.id ?? '',
-    });
-    setFormError('');
-    setIsFormOpen(true);
-    void loadOptions(undefined, null);
+    setIsAddExpenseOpen(true);
   }
 
-  function openEditModal(expense: ExpenseItem) {
+  async function openEditModal(expense: ExpenseItem) {
+    if (expense.emiPlanId) {
+      setLoadingEmiExpenseId(expense.id);
+      setPageError('');
+
+      try {
+        const plan = await fetchApi<EmiPlanDetail>(`/emis/${expense.emiPlanId}`);
+        const installment = plan.installments.find((item) => item.id === expense.id);
+
+        if (!installment) {
+          throw new Error('This EMI installment is no longer available.');
+        }
+
+        setEditingEmiPlan(plan);
+        setEditingEmiInstallment(installment);
+      } catch (requestError) {
+        setPageError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load this EMI installment.',
+        );
+      } finally {
+        setLoadingEmiExpenseId('');
+      }
+
+      return;
+    }
+
     setEditingExpense(expense);
     setExpenseForm(getExpenseForm(expense));
     setFormError('');
     setIsFormOpen(true);
     void loadOptions(undefined, expense);
+  }
+
+  function closeEmiEditModal() {
+    setEditingEmiInstallment(null);
+    setEditingEmiPlan(null);
+  }
+
+  function openDeleteModal(expense: ExpenseItem) {
+    setDeleteScope('single');
+    setEmiModalError('');
+    setDeleteTarget(expense);
   }
 
   function closeFormModal() {
@@ -489,15 +536,30 @@ function ExpensesPage() {
 
     setIsDeleting(true);
     setPageError('');
+    setEmiModalError('');
 
     try {
-      const response = await apiFetch(`/expenses/${deleteTarget.id}`, {
-        method: 'DELETE',
-      });
+      const isEmiInstallment = Boolean(deleteTarget.emiPlanId);
+      const query = new URLSearchParams({ scope: deleteScope });
+      const path = isEmiInstallment
+        ? `/emis/${deleteTarget.emiPlanId}/installments/${deleteTarget.id}?${query.toString()}`
+        : `/expenses/${deleteTarget.id}`;
+      const response = await apiFetch(path, { method: 'DELETE' });
       const data = await readApiBody(response);
 
       if (!response.ok) {
-        setPageError(getApiErrorMessage(data, 'Unable to delete expense.'));
+        const message = getApiErrorMessage(
+          data,
+          isEmiInstallment
+            ? 'Unable to delete this EMI installment.'
+            : 'Unable to delete expense.',
+        );
+
+        if (isEmiInstallment) {
+          setEmiModalError(message);
+        } else {
+          setPageError(message);
+        }
         return;
       }
 
@@ -509,7 +571,13 @@ function ExpensesPage() {
         void loadExpenses();
       }
     } catch {
-      setPageError('Unable to reach the API. Please try again.');
+      const message = 'Unable to reach the API. Please try again.';
+
+      if (deleteTarget.emiPlanId) {
+        setEmiModalError(message);
+      } else {
+        setPageError(message);
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -668,16 +736,35 @@ function ExpensesPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="inline-flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-md bg-[#fff0eb] text-[#f36f4e]">
-                          <ReceiptText size={17} />
+                        <span
+                          className={[
+                            'grid size-10 place-items-center rounded-md',
+                            expense.emiPlanId
+                              ? 'bg-[#edf9f7] text-[#287d75]'
+                              : 'bg-[#fff0eb] text-[#f36f4e]',
+                          ].join(' ')}
+                        >
+                          {expense.emiPlanId ? (
+                            <Landmark size={17} />
+                          ) : (
+                            <ReceiptText size={17} />
+                          )}
                         </span>
                         <div>
                           <p className="text-lg font-bold leading-none text-zinc-950">
                             {formatInr(expense.amountPaise)}
                           </p>
-                          <p className="mt-2 text-xs font-medium text-zinc-500">
-                            {expense.category.name} • {getDateLabel(expense.date)}
-                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-medium text-zinc-500">
+                            <span>
+                              {expense.category.name} • {getDateLabel(expense.date)}
+                            </span>
+                            {expense.emiPlanId ? (
+                              <span className="inline-flex h-5 items-center rounded-full bg-[#dff4f1] px-2 text-[9px] font-bold uppercase leading-none text-[#287d75]">
+                                EMI {expense.emiInstallmentNumber ?? '-'} /{' '}
+                                {expense.emiInstallmentCount ?? '-'}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -695,19 +782,36 @@ function ExpensesPage() {
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
                         <button
-                          aria-label="Edit expense"
+                          aria-label={
+                            expense.emiPlanId ? 'Edit EMI installment' : 'Edit expense'
+                          }
                           className="grid size-9 place-items-center rounded-md border border-zinc-200 bg-white text-zinc-500 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+                          disabled={loadingEmiExpenseId === expense.id}
                           onClick={() => openEditModal(expense)}
-                          title="Edit expense"
+                          title={
+                            expense.emiPlanId ? 'Edit EMI installment' : 'Edit expense'
+                          }
                           type="button"
                         >
-                          <Pencil size={15} />
+                          {loadingEmiExpenseId === expense.id ? (
+                            <Loader2 className="animate-spin" size={15} />
+                          ) : (
+                            <Pencil size={15} />
+                          )}
                         </button>
                         <button
-                          aria-label="Delete expense"
+                          aria-label={
+                            expense.emiPlanId
+                              ? 'Delete EMI installment'
+                              : 'Delete expense'
+                          }
                           className="grid size-9 place-items-center rounded-md border border-rose-100 bg-rose-50 text-rose-500 transition hover:border-rose-200 hover:bg-rose-100"
-                          onClick={() => setDeleteTarget(expense)}
-                          title="Delete expense"
+                          onClick={() => openDeleteModal(expense)}
+                          title={
+                            expense.emiPlanId
+                              ? 'Delete EMI installment'
+                              : 'Delete expense'
+                          }
                           type="button"
                         >
                           <Trash2 size={15} />
@@ -768,15 +872,33 @@ function ExpensesPage() {
         </div>
       </div>
 
+      <AddExpenseModal
+        initialDate={getDefaultDateForMonth(selectedMonthKey)}
+        isOpen={isAddExpenseOpen}
+        onClose={() => setIsAddExpenseOpen(false)}
+        onCreated={() => {
+          setIsAddExpenseOpen(false);
+          setPage(1);
+          void loadExpenses();
+        }}
+      />
+
+      <EmiInstallmentModal
+        installment={editingEmiInstallment}
+        isOpen={Boolean(editingEmiInstallment)}
+        onClose={closeEmiEditModal}
+        onSaved={() => {
+          closeEmiEditModal();
+          void loadExpenses();
+        }}
+        plan={editingEmiPlan}
+      />
+
       <Modal
-        description={
-          editingExpense
-            ? 'Update amount, date, category, tags, or note.'
-            : `Create an expense for ${getMonthLabel(selectedMonthKey)}.`
-        }
+        description="Update amount, date, category, tags, or note."
         isOpen={isFormOpen}
         onClose={closeFormModal}
-        title={editingExpense ? 'Edit expense' : 'Add expense'}
+        title="Edit expense"
       >
         <form className="space-y-3.5" onSubmit={handleSubmit}>
           <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]">
@@ -942,12 +1064,10 @@ function ExpensesPage() {
             >
               {isSaving ? (
                 <Loader2 className="animate-spin" size={14} />
-              ) : editingExpense ? (
-                <Pencil size={14} />
               ) : (
-                <Plus size={14} />
+                <Pencil size={14} />
               )}
-              {editingExpense ? 'Save changes' : 'Add expense'}
+              Save changes
             </button>
           </div>
         </form>
@@ -982,7 +1102,7 @@ function ExpensesPage() {
             : ''
         }
         isLoading={isDeleting}
-        isOpen={Boolean(deleteTarget)}
+        isOpen={Boolean(deleteTarget && !deleteTarget.emiPlanId)}
         onClose={() => {
           if (!isDeleting) {
             setDeleteTarget(null);
@@ -990,6 +1110,21 @@ function ExpensesPage() {
         }}
         onConfirm={handleDelete}
         title="Delete expense?"
+      />
+
+      <EmiDeleteModal
+        error={emiModalError}
+        installment={deleteTarget?.emiPlanId ? deleteTarget : null}
+        isDeleting={isDeleting}
+        onClose={() => {
+          if (!isDeleting) {
+            setDeleteTarget(null);
+            setEmiModalError('');
+          }
+        }}
+        onConfirm={handleDelete}
+        onScopeChange={setDeleteScope}
+        scope={deleteScope}
       />
     </section>
   );

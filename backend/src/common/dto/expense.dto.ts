@@ -153,6 +153,18 @@ export class ExpenseResponseDto {
   @ApiProperty({ example: '2026-05' })
   monthKey: string;
 
+  @ApiPropertyOptional({
+    example: '665d2fb4d5f6a0a42f1f9a24',
+    description: 'Present when this expense is a scheduled EMI installment.',
+  })
+  emiPlanId?: string;
+
+  @ApiPropertyOptional({ example: 3 })
+  emiInstallmentNumber?: number;
+
+  @ApiPropertyOptional({ example: 24 })
+  emiInstallmentCount?: number;
+
   @ApiProperty({ example: '2026-05-20T10:30:00.000Z' })
   createdAt: string;
 

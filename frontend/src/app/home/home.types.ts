@@ -15,6 +15,16 @@ export interface ReportInsightsResponse {
   currentMonthNeedsWants: ReportInsight;
 }
 
+export interface EmiOverview {
+  activePlanCount: number;
+  paidInstallments: number;
+  remainingInstallments: number;
+  progressPercent: number;
+  monthlyCommitmentPaise: number;
+  remainingPaise: number;
+  nextPaymentDate?: string;
+}
+
 export interface ReportCategoryAmount {
   categoryId?: string;
   categoryName: string;

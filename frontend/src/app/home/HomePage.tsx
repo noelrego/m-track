@@ -25,6 +25,7 @@ import type {
   CurrentMonthCategoryCardsResponse,
   CurrentMonthTopExpensesResponse,
   CurrentMonthWeeklyReportResponse,
+  EmiOverview,
   ReportCategoryAmount,
   ReportInsight,
   ReportInsightsResponse,
@@ -33,6 +34,7 @@ import { WeeklyExpenseChart } from './WeeklyExpenseChart';
 
 interface DashboardData {
   categoryCards: CurrentMonthCategoryCardsResponse | null;
+  emiOverview: EmiOverview | null;
   insights: ReportInsightsResponse | null;
   topExpenses: CurrentMonthTopExpensesResponse | null;
   weekly: CurrentMonthWeeklyReportResponse | null;
@@ -40,6 +42,7 @@ interface DashboardData {
 
 const emptyDashboardData: DashboardData = {
   categoryCards: null,
+  emiOverview: null,
   insights: null,
   topExpenses: null,
   weekly: null,
@@ -132,7 +135,13 @@ function HomePage() {
     setError('');
 
     try {
-      const [insightsData, categoryCardsData, weeklyData, topExpensesData] =
+      const [
+        insightsData,
+        categoryCardsData,
+        weeklyData,
+        topExpensesData,
+        emiOverviewData,
+      ] =
         await Promise.all([
           fetchApi<ReportInsightsResponse>('/report/insights', signal),
           fetchApi<CurrentMonthCategoryCardsResponse>(
@@ -147,11 +156,13 @@ function HomePage() {
             '/report/current-month/top-expenses',
             signal,
           ),
+          fetchApi<EmiOverview>('/emis/overview', signal),
         ]);
 
       if (!signal?.aborted) {
         setDashboardData({
           categoryCards: categoryCardsData,
+          emiOverview: emiOverviewData,
           insights: insightsData,
           topExpenses: topExpensesData,
           weekly: weeklyData,
@@ -178,39 +189,61 @@ function HomePage() {
 
   return (
     <section className="space-y-8">
+      <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase text-[#f36f4e]">
+            SpendWise
+          </p>
+          <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">
+            Dashboard
+          </h2>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#f36f4e] px-3 text-xs font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
+            onClick={() => setIsAddExpenseOpen(true)}
+            type="button"
+          >
+            <Plus size={14} />
+            Add expense
+          </button>
+          <Link
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#66bfb6]/60 hover:text-[#287d74]"
+            to="/ai-assist"
+          >
+            <Sparkles size={14} />
+            AI Assist
+          </Link>
+          <Link
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+            to="/expenses"
+          >
+            <ReceiptText size={14} />
+            Expenses
+          </Link>
+          <button
+            aria-label="Refresh dashboard"
+            className="grid size-9 place-items-center rounded-md border border-[#eadfd5] bg-white text-zinc-500 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isLoading}
+            onClick={() => loadDashboard()}
+            title="Refresh dashboard"
+            type="button"
+          >
+            <RefreshCcw className={isLoading ? 'animate-spin' : ''} size={15} />
+          </button>
+        </div>
+      </header>
+
+      {error ? (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
       <div className="grid gap-7 xl:grid-cols-[1.35fr_0.85fr]">
-        <div className="order-2 xl:order-1">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase text-[#f36f4e]">
-                SpendWise
-              </p>
-              <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">
-                Dashboard
-              </h2>
-            </div>
-
-            <button
-              className="inline-flex w-fit items-center gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isLoading}
-              onClick={() => loadDashboard()}
-              type="button"
-            >
-              <RefreshCcw
-                className={isLoading ? 'animate-spin' : ''}
-                size={16}
-              />
-              Refresh
-            </button>
-          </div>
-
-          {error ? (
-            <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+        <div className="order-2 h-full xl:order-1">
+          <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-stretch">
             {isLoading && !insights.length
               ? [0, 1, 2].map((item) => <InsightSkeleton key={item} />)
               : insights.map((insight, index) => (
@@ -224,47 +257,15 @@ function HomePage() {
         </div>
 
         <motion.div
-          className="order-1 relative overflow-hidden rounded-lg border border-[#eadfd5] bg-[#f7efe8] p-6 shadow-xl shadow-[#dfb49f]/15 xl:order-2"
+          className="order-1 xl:order-2"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut' }}
         >
-          <div className="absolute right-5 top-5 grid size-12 place-items-center rounded-full bg-white text-[#f36f4e] shadow-lg shadow-[#dfb49f]/20">
-            <Sparkles size={20} />
-          </div>
-          <p className="max-w-[220px] text-sm font-semibold uppercase text-[#f36f4e]">
-            Quick action
-          </p>
-          <h3 className="mt-4 max-w-[260px] text-2xl font-bold leading-tight text-zinc-950">
-            Capture the spend while it is fresh
-          </h3>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-500">
-            Add today&apos;s expense with category, tags, and note in one flow.
-          </p>
-          <div className="mt-6 grid grid-cols-3 gap-2">
-            <button
-              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md bg-[#f36f4e] px-2 text-[11px] font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
-              onClick={() => setIsAddExpenseOpen(true)}
-              type="button"
-            >
-              <Plus size={13} />
-              <span className="truncate">Add Expense</span>
-            </button>
-            <Link
-              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-[#eadfd5] bg-white px-2 text-[11px] font-bold text-zinc-600 transition hover:border-[#66bfb6]/60 hover:text-[#287d74]"
-              to="/ai-assist"
-            >
-              <Sparkles size={13} />
-              <span className="truncate">AI Assist</span>
-            </Link>
-            <Link
-              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-[#eadfd5] bg-white px-2 text-[11px] font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
-              to="/expenses"
-            >
-              <ReceiptText size={13} />
-              <span className="truncate">View Expense</span>
-            </Link>
-          </div>
+          <EmiOverviewCard
+            data={dashboardData.emiOverview}
+            isLoading={isLoading}
+          />
         </motion.div>
       </div>
 
@@ -379,6 +380,127 @@ function HomePage() {
   );
 }
 
+function EmiOverviewCard({
+  data,
+  isLoading,
+}: {
+  data: EmiOverview | null;
+  isLoading: boolean;
+}) {
+  if (isLoading && !data) {
+    return (
+      <section className="h-full rounded-lg border border-[#d8e9e6] bg-white p-4 shadow-xl shadow-[#8dbbb4]/15">
+        <div className="h-4 w-28 animate-pulse rounded-full bg-zinc-100" />
+        <div className="mt-3 flex items-center gap-4">
+          <div className="size-[4.75rem] shrink-0 animate-pulse rounded-full bg-zinc-100" />
+          <div className="flex-1 space-y-3">
+            <div className="h-4 w-full animate-pulse rounded-full bg-zinc-100" />
+            <div className="h-4 w-4/5 animate-pulse rounded-full bg-zinc-100" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const overview: EmiOverview = data ?? {
+    activePlanCount: 0,
+    monthlyCommitmentPaise: 0,
+    nextPaymentDate: undefined,
+    paidInstallments: 0,
+    progressPercent: 0,
+    remainingInstallments: 0,
+    remainingPaise: 0,
+  };
+  const progress = Math.min(100, Math.max(0, overview.progressPercent));
+  const totalInstallments =
+    overview.paidInstallments + overview.remainingInstallments;
+
+  return (
+    <section className="h-full rounded-lg border border-[#d8e9e6] bg-white p-4 shadow-xl shadow-[#8dbbb4]/15">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-[#287d75]">
+            EMI portfolio
+          </p>
+          <h3 className="mt-0.5 text-base font-bold text-zinc-950">
+            {overview.activePlanCount
+              ? `${overview.activePlanCount} active EMI${
+                  overview.activePlanCount === 1 ? '' : 's'
+                }`
+              : 'No active EMIs'}
+          </h3>
+        </div>
+        <Link
+          aria-label="View EMIs"
+          className="grid size-8 shrink-0 place-items-center rounded-md bg-[#edf9f7] text-[#287d75] transition hover:bg-[#dff4f1]"
+          title="View EMIs"
+          to="/emis"
+        >
+          <ArrowUpRight size={16} />
+        </Link>
+      </div>
+
+      <div className="mt-3 grid grid-cols-[4.75rem_minmax(0,1fr)] items-center gap-4">
+        <div
+          aria-label={`${progress}% of active EMI installments complete`}
+          className="grid size-[4.75rem] place-items-center rounded-full"
+          role="img"
+          style={{
+            background: `conic-gradient(#66bfb6 0 ${progress}%, #e7efed ${progress}% 100%)`,
+          }}
+        >
+          <div className="grid size-[3.75rem] place-items-center rounded-full bg-white text-center shadow-inner shadow-[#8dbbb4]/10">
+            <div>
+              <p className="text-xl font-extrabold leading-none text-zinc-950">
+                {progress}%
+              </p>
+              <p className="mt-1 text-[8px] font-bold uppercase text-zinc-500">
+                Paid
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <dl className="min-w-0 divide-y divide-[#edf1ef]">
+            <div className="min-w-0 pb-2">
+              <dt className="text-[9px] font-semibold text-zinc-500">
+                Monthly commitment
+              </dt>
+              <dd className="mt-0.5 truncate text-sm font-extrabold text-zinc-950">
+                {formatInr(overview.monthlyCommitmentPaise)}
+              </dd>
+            </div>
+            <div className="min-w-0 pt-2">
+              <dt className="text-[9px] font-semibold text-zinc-500">
+                Remaining balance
+              </dt>
+              <dd className="mt-0.5 truncate text-sm font-bold text-zinc-900">
+                {formatInr(overview.remainingPaise)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-3">
+            <div className="flex items-center justify-between gap-2 text-[8px] font-bold text-zinc-500">
+              <span>Installments paid</span>
+              <span>
+                {overview.paidInstallments} of {totalInstallments}
+              </span>
+            </div>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#e7efed]">
+              <span
+                className="block h-full rounded-full bg-[#66bfb6] transition-[width] duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function InsightCard({
   icon: Icon,
   insight,
@@ -387,8 +509,8 @@ function InsightCard({
   insight: ReportInsight;
 }) {
   return (
-    <div className="min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/20">
-      <div className="flex min-h-[6.25rem] flex-col justify-between">
+    <div className="h-full min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/20">
+      <div className="flex min-h-[6.25rem] h-full flex-col justify-between">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <p
             className="min-w-0 truncate whitespace-nowrap text-[11px] font-semibold leading-5 text-zinc-500 2xl:text-xs"
@@ -447,8 +569,8 @@ function getCategoryCards(data: CurrentMonthCategoryCardsResponse | null) {
 
 function InsightSkeleton() {
   return (
-    <div className="min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/15">
-      <div className="flex min-h-[6.25rem] flex-col justify-between">
+    <div className="h-full min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/15">
+      <div className="flex min-h-[6.25rem] h-full flex-col justify-between">
         <div className="h-4 w-28 animate-pulse rounded-full bg-zinc-200" />
         <div className="h-6 w-32 animate-pulse rounded-full bg-zinc-200" />
       </div>

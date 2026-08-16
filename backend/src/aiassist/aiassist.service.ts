@@ -79,6 +79,9 @@ interface AiAssistCurrentDraftContext {
 const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const DEFAULT_OPENROUTER_MODEL = 'google/gemini-3.1-flash-lite';
 const EXPENSE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const AI_EXPENSE_CATEGORY_KEYS = EXPENSE_CATEGORY_KEYS.filter(
+  (categoryKey) => categoryKey !== ExpenseCategoryKey.Emis,
+);
 
 @Injectable()
 export class AiAssistService {
@@ -373,7 +376,7 @@ export class AiAssistService {
       'Return exactly one valid JSON object and nothing else.',
       'Do not wrap the JSON in markdown fences.',
       'The JSON object must have these keys and types:',
-      '{"amountPaise": number, "categoryKey": "needs"|"wants"|"emis"|"extra"|"invest"|"rent"|"unknown", "confidence": number, "date": "YYYY-MM-DD", "missingFields": string[], "note": string, "replyText": string, "tagNames": string[]}',
+      '{"amountPaise": number, "categoryKey": "needs"|"wants"|"extra"|"invest"|"rent"|"unknown", "confidence": number, "date": "YYYY-MM-DD", "missingFields": string[], "note": string, "replyText": string, "tagNames": string[]}',
     ].join(' ');
   }
 
@@ -390,7 +393,7 @@ export class AiAssistService {
         categoryKey: {
           description:
             'Final selected category normalizedName, or unknown if it needs user clarification.',
-          enum: [...EXPENSE_CATEGORY_KEYS, 'unknown'],
+          enum: [...AI_EXPENSE_CATEGORY_KEYS, 'unknown'],
           type: 'string',
         },
         confidence: {
@@ -568,7 +571,10 @@ export class AiAssistService {
 
   private async loadActiveCategories(): Promise<CategoryDocument[]> {
     return this.categoryModel
-      .find({ isActive: true })
+      .find({
+        isActive: true,
+        normalizedName: { $ne: ExpenseCategoryKey.Emis },
+      })
       .sort({ sortOrder: 1, name: 1 })
       .exec();
   }

@@ -13,6 +13,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
+import { ExpenseCategoryKey } from '../../common';
 import {
   apiFetch,
   getApiErrorMessage,
@@ -168,7 +169,11 @@ function AiAssistPage() {
         }
 
         if (categoriesResponse.ok && Array.isArray(categoriesData)) {
-          setCategories(categoriesData as AiAssistDraftCategory[]);
+          setCategories(
+            (categoriesData as AiAssistDraftCategory[]).filter(
+              (category) => category.normalizedName !== ExpenseCategoryKey.Emis,
+            ),
+          );
         }
 
         if (tagsResponse.ok && Array.isArray(tagsData)) {

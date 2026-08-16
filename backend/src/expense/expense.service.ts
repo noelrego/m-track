@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, Model } from 'mongoose';
+import { isValidObjectId, Model, QueryFilter } from 'mongoose';
 import {
   AppLogger,
   CreateExpenseDto,
   ExpenseCategorySummaryDto,
+  ExpenseCategoryKey,
   ExpenseResponseDto,
   ListExpensesResponseDto,
   ListExpensesQueryDto,
@@ -54,7 +55,10 @@ export class ExpenseService {
     const parsedDate = this.parseExpenseDate(createExpenseDto.date);
 
     try {
-      await this.findActiveCategoryOrThrow(createExpenseDto.categoryId);
+      const category = await this.findActiveCategoryOrThrow(
+        createExpenseDto.categoryId,
+      );
+      this.ensureRegularExpenseCategory(category);
       await this.ensureTagsBelongToUser(createExpenseDto.tagIds ?? [], ownerUserId);
 
       const expense = await this.expenseModel.create({
@@ -88,11 +92,13 @@ export class ExpenseService {
     const limit = query.limit ?? 10;
 
     try {
+      const filter = await this.buildExpenseLedgerFilter(
+        ownerUserId,
+        monthRange.start,
+        monthRange.end,
+      );
       const expenses = await this.expenseModel
-        .find({
-          ownerUserId,
-          spentAt: { $gte: monthRange.start, $lt: monthRange.end },
-        })
+        .find(filter)
         .sort({ spentAt: -1, createdAt: -1 })
         .limit(limit)
         .exec();
@@ -117,10 +123,11 @@ export class ExpenseService {
     const skip = (page - 1) * limit;
 
     try {
-      const filter = {
+      const filter = await this.buildExpenseLedgerFilter(
         ownerUserId,
-        spentAt: { $gte: monthRange.start, $lt: monthRange.end },
-      };
+        monthRange.start,
+        monthRange.end,
+      );
       const [expenses, total] = await Promise.all([
         this.expenseModel
           .find(filter)
@@ -164,6 +171,10 @@ export class ExpenseService {
   ): Promise<ExpenseResponseDto> {
     const expense = await this.findOwnedExpenseOrThrow(expenseId, ownerUserId);
 
+    if (expense.emiPlanId) {
+      throw new BadRequestException('Use the EMI page to update this installment');
+    }
+
     try {
       if (updateExpenseDto.amountPaise !== undefined) {
         expense.amountPaise = updateExpenseDto.amountPaise;
@@ -176,7 +187,10 @@ export class ExpenseService {
       }
 
       if (updateExpenseDto.categoryId) {
-        await this.findActiveCategoryOrThrow(updateExpenseDto.categoryId);
+        const category = await this.findActiveCategoryOrThrow(
+          updateExpenseDto.categoryId,
+        );
+        this.ensureRegularExpenseCategory(category);
         expense.categoryId = updateExpenseDto.categoryId;
       }
 
@@ -205,6 +219,10 @@ export class ExpenseService {
 
   async deleteExpense(expenseId: string, ownerUserId: string) {
     const expense = await this.findOwnedExpenseOrThrow(expenseId, ownerUserId);
+
+    if (expense.emiPlanId) {
+      throw new BadRequestException('Use the EMI page to delete this installment');
+    }
 
     try {
       await expense.deleteOne();
@@ -306,6 +324,39 @@ export class ExpenseService {
     }
 
     return category;
+  }
+
+  private ensureRegularExpenseCategory(category: CategoryDocument) {
+    if (category.normalizedName === ExpenseCategoryKey.Emis) {
+      throw new BadRequestException(
+        'Use the EMI plan endpoint to create or update EMI expenses',
+      );
+    }
+  }
+
+  private async buildExpenseLedgerFilter(
+    ownerUserId: string,
+    start: Date,
+    end: Date,
+  ): Promise<QueryFilter<Expense>> {
+    const emiCategories = await this.categoryModel
+      .find({ normalizedName: ExpenseCategoryKey.Emis })
+      .select('_id')
+      .exec();
+    const filter: QueryFilter<Expense> = {
+      ownerUserId,
+      spentAt: { $gte: start, $lt: end },
+    };
+
+    if (emiCategories.length) {
+      // Linked installments belong in the monthly ledger; ungrouped legacy EMIs do not.
+      filter.$or = [
+        { categoryId: { $nin: emiCategories.map((category) => category.id) } },
+        { emiPlanId: { $type: 'string' } },
+      ];
+    }
+
+    return filter;
   }
 
   private async ensureTagsBelongToUser(
@@ -419,6 +470,9 @@ export class ExpenseService {
         .map((tag) => ({ id: tag.id, name: tag.name })),
       note: expense.note,
       monthKey: expense.monthKey,
+      emiPlanId: expense.emiPlanId,
+      emiInstallmentNumber: expense.emiInstallmentNumber,
+      emiInstallmentCount: expense.emiInstallmentCount,
       createdAt: expense.createdAt.toISOString(),
       updatedAt: expense.updatedAt.toISOString(),
     };

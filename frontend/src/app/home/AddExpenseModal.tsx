@@ -10,9 +10,13 @@ import {
 } from '../../shared/api/api-client';
 import { Modal } from '../../shared/components/Modal';
 import { normalizeInrInput, parseInrToPaise } from '../../shared/utils/money';
+import { EmiScheduleFields } from '../emis/EmiScheduleFields';
+import type { EmiAmountMode, EmiScheduleFormValue } from '../emis/emi.types';
 import type { CategoryOption, TagOption } from './home.types';
 
 interface AddExpenseModalProps {
+  initialCategoryKey?: ExpenseCategoryKey;
+  initialDate?: string;
   isOpen: boolean;
   onClose: () => void;
   onCreated: () => void;
@@ -45,12 +49,19 @@ function normalizeCategoryOrder(categories: CategoryOption[]) {
 }
 
 export function AddExpenseModal({
+  initialCategoryKey,
+  initialDate,
   isOpen,
   onClose,
   onCreated,
 }: AddExpenseModalProps) {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(getTodayDateInputValue);
+  const [emiName, setEmiName] = useState('');
+  const [emiLender, setEmiLender] = useState('');
+  const [emiAmountMode, setEmiAmountMode] =
+    useState<EmiAmountMode>('monthly');
+  const [emiNumberOfMonths, setEmiNumberOfMonths] = useState('12');
   const [note, setNote] = useState('');
   const [tagSearch, setTagSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -67,6 +78,8 @@ export function AddExpenseModal({
       return;
     }
 
+    setDate(initialDate ?? getTodayDateInputValue());
+
     const controller = new AbortController();
 
     loadOptions(controller.signal);
@@ -74,7 +87,12 @@ export function AddExpenseModal({
     return () => {
       controller.abort();
     };
-  }, [isOpen]);
+  }, [initialCategoryKey, initialDate, isOpen]);
+
+  const selectedCategory = categories.find(
+    (category) => category.id === selectedCategoryId,
+  );
+  const isEmi = selectedCategory?.normalizedName === ExpenseCategoryKey.Emis;
 
   const selectedTags = useMemo(
     () => tags.filter((tag) => selectedTagIds.includes(tag.id)),
@@ -132,7 +150,12 @@ export function AddExpenseModal({
       setCategories(categoryOptions);
       setTags(Array.isArray(tagsData) ? tagsData : []);
       setSelectedCategoryId((currentCategoryId) =>
-        currentCategoryId || categoryOptions[0]?.id || '',
+        currentCategoryId ||
+        categoryOptions.find(
+          (category) => category.normalizedName === initialCategoryKey,
+        )?.id ||
+        categoryOptions[0]?.id ||
+        '',
       );
     } catch {
       if (!signal?.aborted) {
@@ -148,9 +171,14 @@ export function AddExpenseModal({
   function resetForm() {
     setAmount('');
     setDate(getTodayDateInputValue());
+    setEmiName('');
+    setEmiLender('');
+    setEmiAmountMode('monthly');
+    setEmiNumberOfMonths('12');
     setNote('');
     setTagSearch('');
     setSelectedTagIds([]);
+    setSelectedCategoryId('');
     setError('');
   }
 
@@ -171,6 +199,29 @@ export function AddExpenseModal({
     );
   }
 
+  function updateEmiField(field: keyof EmiScheduleFormValue, value: string) {
+    switch (field) {
+      case 'amount':
+        setAmount(value);
+        break;
+      case 'amountMode':
+        setEmiAmountMode(value as EmiAmountMode);
+        break;
+      case 'lender':
+        setEmiLender(value);
+        break;
+      case 'name':
+        setEmiName(value);
+        break;
+      case 'numberOfMonths':
+        setEmiNumberOfMonths(value);
+        break;
+      case 'startDate':
+        setDate(value);
+        break;
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
@@ -187,23 +238,57 @@ export function AddExpenseModal({
       return;
     }
 
+    const numberOfMonths = Number(emiNumberOfMonths);
+
+    if (isEmi && !emiName.trim()) {
+      setError('Enter a name for this EMI, such as House loan.');
+      return;
+    }
+
+    if (
+      isEmi &&
+      (!Number.isInteger(numberOfMonths) || numberOfMonths < 1 || numberOfMonths > 600)
+    ) {
+      setError('Enter a valid number of months between 1 and 600.');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      const response = await apiFetch('/expenses', {
+      const response = await apiFetch(isEmi ? '/emis' : '/expenses', {
         method: 'POST',
-        body: JSON.stringify({
-          amountPaise,
-          date,
-          categoryId: selectedCategoryId,
-          tagIds: selectedTagIds,
-          note: note.trim() || undefined,
-        }),
+        body: JSON.stringify(
+          isEmi
+            ? {
+                name: emiName.trim(),
+                lender: emiLender.trim() || undefined,
+                amountMode: emiAmountMode,
+                amountPaise,
+                numberOfMonths,
+                startDate: date,
+                categoryId: selectedCategoryId,
+                tagIds: selectedTagIds,
+                note: note.trim() || undefined,
+              }
+            : {
+                amountPaise,
+                date,
+                categoryId: selectedCategoryId,
+                tagIds: selectedTagIds,
+                note: note.trim() || undefined,
+              },
+        ),
       });
       const data = await readApiBody(response);
 
       if (!response.ok) {
-        setError(getApiErrorMessage(data, 'Unable to save expense.'));
+        setError(
+          getApiErrorMessage(
+            data,
+            isEmi ? 'Unable to create EMI plan.' : 'Unable to save expense.',
+          ),
+        );
         return;
       }
 
@@ -253,44 +338,16 @@ export function AddExpenseModal({
 
   return (
     <Modal
-      description="Add the spend before it gets fuzzy."
+      description={
+        isEmi
+          ? 'Create the monthly schedule once and manage it from EMIs.'
+          : 'Add the spend before it gets fuzzy.'
+      }
       isOpen={isOpen}
       onClose={closeModal}
-      title="Add expense"
+      title={isEmi ? 'Add EMI plan' : 'Add expense'}
     >
       <form className="space-y-3.5" onSubmit={handleSubmit}>
-        <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]">
-          <label className="block">
-            <span className="text-xs font-semibold text-zinc-800">Date</span>
-            <span className="mt-1.5 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
-              <CalendarDays size={14} className="text-zinc-400" />
-              <input
-                className="min-w-0 flex-1 bg-transparent outline-none"
-                onChange={(event) => setDate(event.target.value)}
-                required
-                type="date"
-                value={date}
-              />
-            </span>
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-semibold text-zinc-800">Expense</span>
-            <input
-              className="mt-1.5 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
-              inputMode="decimal"
-              onChange={(event) =>
-                setAmount(normalizeInrInput(event.target.value))
-              }
-              pattern="\d+(\.\d{0,2})?"
-              placeholder="200.96"
-              required
-              type="text"
-              value={amount}
-            />
-          </label>
-        </div>
-
         <div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-semibold text-zinc-800">Category</span>
@@ -325,6 +382,53 @@ export function AddExpenseModal({
             })}
           </div>
         </div>
+
+        {isEmi ? (
+          <EmiScheduleFields
+            disabled={isSaving}
+            onChange={updateEmiField}
+            value={{
+              amount,
+              amountMode: emiAmountMode,
+              lender: emiLender,
+              name: emiName,
+              numberOfMonths: emiNumberOfMonths,
+              startDate: date,
+            }}
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]">
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-800">Date</span>
+              <span className="mt-1.5 flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus-within:border-[#f36f4e] focus-within:ring-4 focus-within:ring-[#f36f4e]/10">
+                <CalendarDays size={14} className="text-zinc-400" />
+                <input
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                  onChange={(event) => setDate(event.target.value)}
+                  required
+                  type="date"
+                  value={date}
+                />
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-800">Expense</span>
+              <input
+                className="mt-1.5 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
+                inputMode="decimal"
+                onChange={(event) =>
+                  setAmount(normalizeInrInput(event.target.value))
+                }
+                pattern="\d+(\.\d{0,2})?"
+                placeholder="200.96"
+                required
+                type="text"
+                value={amount}
+              />
+            </label>
+          </div>
+        )}
 
         <div>
           <label className="block">
@@ -418,13 +522,13 @@ export function AddExpenseModal({
           >
             Cancel
           </button>
-            <button
-              className="inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSaving || isLoadingOptions || isCreatingTag}
-              type="submit"
-            >
+          <button
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dc5f42] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSaving || isLoadingOptions || isCreatingTag}
+            type="submit"
+          >
             {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-            Add expense
+            {isEmi ? 'Create EMI' : 'Add expense'}
           </button>
         </div>
       </form>

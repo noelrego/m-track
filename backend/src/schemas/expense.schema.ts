@@ -58,6 +58,24 @@ export class Expense {
   })
   note?: string;
 
+  @Prop({
+    type: String,
+    index: true,
+  })
+  emiPlanId?: string;
+
+  @Prop({
+    min: 1,
+    type: Number,
+  })
+  emiInstallmentNumber?: number;
+
+  @Prop({
+    min: 1,
+    type: Number,
+  })
+  emiInstallmentCount?: number;
+
   createdAt: Date;
 
   updatedAt: Date;
@@ -68,3 +86,10 @@ export const ExpenseSchema = SchemaFactory.createForClass(Expense);
 ExpenseSchema.index({ ownerUserId: 1, spentAt: -1, createdAt: -1 });
 ExpenseSchema.index({ ownerUserId: 1, monthKey: 1 });
 ExpenseSchema.index({ ownerUserId: 1, monthKey: 1, categoryId: 1 });
+ExpenseSchema.index(
+  { ownerUserId: 1, emiPlanId: 1, emiInstallmentNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { emiPlanId: { $type: 'string' } },
+  },
+);

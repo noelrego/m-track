@@ -11,6 +11,7 @@ const LoginPage = lazy(() => import('../public/login/LoginPage'));
 const AiAssistPage = lazy(() => import('./ai-assist/AiAssistPage'));
 const HomePage = lazy(() => import('./home/HomePage'));
 const ExpensesPage = lazy(() => import('./expenses/ExpensesPage'));
+const EmisPage = lazy(() => import('./emis/EmisPage'));
 const TagsPage = lazy(() => import('./tags/TagsPage'));
 const ReportsPage = lazy(() => import('./reports/ReportsPage'));
 const CategoriesPage = lazy(() => import('./categories/CategoriesPage'));
@@ -36,6 +37,7 @@ export function AppRoutes() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/ai-assist" element={<AiAssistPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
+              <Route path="/emis" element={<EmisPage />} />
               <Route path="/tags" element={<TagsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route

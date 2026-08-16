@@ -3,6 +3,7 @@ import {
   BarChart3,
   FolderKanban,
   Home,
+  Landmark,
   ReceiptText,
   Sparkles,
   Tags,
@@ -40,6 +41,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: ReceiptText,
     label: 'Expenses',
     path: '/expenses',
+    roles: [UserRole.Admin, UserRole.User],
+  },
+  {
+    icon: Landmark,
+    label: 'EMIs',
+    path: '/emis',
     roles: [UserRole.Admin, UserRole.User],
   },
   {
