@@ -1,21 +1,13 @@
 import { ResponsiveLine } from '@nivo/line';
 import { ExpenseCategoryKey } from '../../common';
 import { formatInr } from '../../shared/utils/money';
+import { categoryColors } from './category-colors';
 import type { MonthlyCategoryExpenseTrendResponse } from './reports.types';
 
 interface CategoryExpenseLineChartProps {
   data: MonthlyCategoryExpenseTrendResponse | null;
   selectedCategory: ExpenseCategoryKey | 'all';
 }
-
-const categoryColors: Record<ExpenseCategoryKey, string> = {
-  [ExpenseCategoryKey.Needs]: '#66bfb6',
-  [ExpenseCategoryKey.Wants]: '#f5b33d',
-  [ExpenseCategoryKey.Emis]: '#8d78d6',
-  [ExpenseCategoryKey.Extra]: '#f36f4e',
-  [ExpenseCategoryKey.Invest]: '#242424',
-  [ExpenseCategoryKey.Rent]: '#2f6fed',
-};
 
 export function CategoryExpenseLineChart({
   data,

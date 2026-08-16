@@ -14,6 +14,7 @@ import type {
   MonthlyExpenseWindow,
 } from './reports.types';
 import { CategoryExpenseLineChart } from './CategoryExpenseLineChart';
+import { CategorySpendingDonut } from './CategorySpendingDonut';
 import { MonthlyTagReport } from './MonthlyTagReport';
 import { YearlyExpenseLineChart } from './YearlyExpenseLineChart';
 
@@ -161,10 +162,29 @@ function ReportsPage() {
           </h2>
         </div>
 
-        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-zinc-600 shadow-lg shadow-[#dfb49f]/15">
-          <CalendarDays size={14} />
-          {selectedWindowLabel}
-        </div>
+        <label className="relative inline-flex w-fit">
+          <span className="sr-only">Report range</span>
+          <CalendarDays
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f36f4e]"
+            size={14}
+          />
+          <select
+            aria-label="Report range"
+            className="h-10 appearance-none rounded-md border border-[#eadfd5] bg-white py-2 pl-9 pr-9 text-xs font-bold text-zinc-700 shadow-lg shadow-[#dfb49f]/15 outline-none transition hover:border-[#f36f4e]/40 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
+            onChange={(event) => handleMonthWindowChange(event.target.value)}
+            value={selectedMonthWindow}
+          >
+            {monthlyExpenseWindowOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"
+            size={14}
+          />
+        </label>
       </div>
 
       {error ? (
@@ -173,71 +193,61 @@ function ReportsPage() {
         </div>
       ) : null}
 
-      <motion.section
-        className="w-full rounded-lg border border-[#eadfd5] bg-white p-5 shadow-xl shadow-[#dfb49f]/15 sm:p-6"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: 'easeOut' }}
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-zinc-950">
-              Monthly expense trend
-            </h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              Total spending across all categories for the selected window.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="relative inline-flex">
-              <span className="sr-only">Monthly expense range</span>
-              <select
-                aria-label="Monthly expense range"
-                className="h-9 appearance-none rounded-md border border-[#eadfd5] bg-white px-3 py-2 pr-8 text-xs font-bold text-zinc-700 outline-none transition hover:border-[#f36f4e]/40 focus:border-[#f36f4e] focus:ring-4 focus:ring-[#f36f4e]/10"
-                onChange={(event) =>
-                  handleMonthWindowChange(event.target.value)
-                }
-                value={selectedMonthWindow}
-              >
-                {monthlyExpenseWindowOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400"
-                size={14}
-              />
-            </label>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(250px,3fr)]">
+        <motion.section
+          className="min-w-0 rounded-lg border border-[#eadfd5] bg-white p-5 shadow-xl shadow-[#dfb49f]/15 sm:p-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut' }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-2xl font-bold text-zinc-950">
+                Monthly expense trend
+              </h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Total spending across all categories for the selected window.
+              </p>
+            </div>
 
             <div className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-[#fff0eb] px-3 py-2 text-sm font-bold text-[#b1462d]">
               <TrendingUp size={16} />
               {formatInr(monthlyTotalPaise)}
             </div>
           </div>
-        </div>
 
-        {isLoading && !monthlyExpense ? (
-          <div className="mt-5 grid h-[260px] place-items-center rounded-lg bg-[#fbfaf7] text-sm text-zinc-500">
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="animate-spin" size={16} />
-              Loading trend...
-            </span>
-          </div>
-        ) : (
-          <div className="mt-5">
-            <YearlyExpenseLineChart data={monthlyExpense} />
-          </div>
-        )}
-      </motion.section>
+          {isLoading && !monthlyExpense ? (
+            <div className="mt-5 grid h-[260px] place-items-center rounded-lg bg-[#fbfaf7] text-sm text-zinc-500">
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="animate-spin" size={16} />
+                Loading trend...
+              </span>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <YearlyExpenseLineChart data={monthlyExpense} />
+            </div>
+          )}
+        </motion.section>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.04 }}
+        >
+          <CategorySpendingDonut
+            data={categoryExpense}
+            isLoading={isLoading}
+            rangeLabel={selectedWindowLabel}
+          />
+        </motion.div>
+      </div>
 
       <motion.section
         className="w-full rounded-lg border border-[#eadfd5] bg-white p-5 shadow-xl shadow-[#dfb49f]/15 sm:p-6"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: 'easeOut', delay: 0.04 }}
+        transition={{ duration: 0.28, ease: 'easeOut', delay: 0.08 }}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>

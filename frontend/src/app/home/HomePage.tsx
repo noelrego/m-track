@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import {
+  animate as animateMotionValue,
+  motion,
+  useReducedMotion,
+} from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -10,7 +14,6 @@ import {
   ReceiptText,
   RefreshCcw,
   Sparkles,
-  TrendingUp,
   WalletCards,
 } from 'lucide-react';
 import { ExpenseCategoryKey } from '../../common';
@@ -27,7 +30,6 @@ import type {
   CurrentMonthWeeklyReportResponse,
   EmiOverview,
   ReportCategoryAmount,
-  ReportInsight,
   ReportInsightsResponse,
 } from './home.types';
 import { WeeklyExpenseChart } from './WeeklyExpenseChart';
@@ -118,18 +120,6 @@ function HomePage() {
     };
   }, []);
 
-  const insights = useMemo(
-    () =>
-      dashboardData.insights
-        ? [
-            dashboardData.insights.lastMonthAllExpense,
-            dashboardData.insights.currentMonthAllExpense,
-            dashboardData.insights.currentMonthNeedsWants,
-          ]
-        : [],
-    [dashboardData.insights],
-  );
-
   async function loadDashboard(signal?: AbortSignal) {
     setIsLoading(true);
     setError('');
@@ -199,9 +189,9 @@ function HomePage() {
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-2 sm:flex-wrap">
           <button
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#f36f4e] px-3 text-xs font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#f36f4e] px-3 text-xs font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42] sm:rounded-md"
             onClick={() => setIsAddExpenseOpen(true)}
             type="button"
           >
@@ -209,22 +199,26 @@ function HomePage() {
             Add expense
           </button>
           <Link
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#66bfb6]/60 hover:text-[#287d74]"
+            aria-label="AI Assist"
+            className="inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#eadfd5] bg-white text-xs font-bold text-zinc-600 transition hover:border-[#66bfb6]/60 hover:text-[#287d74] sm:h-9 sm:w-auto sm:rounded-md sm:px-3"
+            title="AI Assist"
             to="/ai-assist"
           >
             <Sparkles size={14} />
-            AI Assist
+            <span className="hidden sm:inline">AI Assist</span>
           </Link>
           <Link
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[#eadfd5] bg-white px-3 text-xs font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
+            aria-label="Expenses"
+            className="inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#eadfd5] bg-white text-xs font-bold text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] sm:h-9 sm:w-auto sm:rounded-md sm:px-3"
+            title="Expenses"
             to="/expenses"
           >
             <ReceiptText size={14} />
-            Expenses
+            <span className="hidden sm:inline">Expenses</span>
           </Link>
           <button
             aria-label="Refresh dashboard"
-            className="grid size-9 place-items-center rounded-md border border-[#eadfd5] bg-white text-zinc-500 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
+            className="grid size-9 shrink-0 place-items-center rounded-full border border-[#eadfd5] bg-white text-zinc-500 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-md"
             disabled={isLoading}
             onClick={() => loadDashboard()}
             title="Refresh dashboard"
@@ -242,22 +236,15 @@ function HomePage() {
       ) : null}
 
       <div className="grid gap-7 xl:grid-cols-[1.35fr_0.85fr]">
-        <div className="order-2 h-full xl:order-1">
-          <div className="flex h-full flex-col gap-3 sm:flex-row sm:items-stretch">
-            {isLoading && !insights.length
-              ? [0, 1, 2].map((item) => <InsightSkeleton key={item} />)
-              : insights.map((insight, index) => (
-                  <InsightCard
-                    icon={index === 2 ? TrendingUp : WalletCards}
-                    insight={insight}
-                    key={insight.key}
-                  />
-                ))}
-          </div>
+        <div className="order-1 h-full">
+          <SpendingSnapshotCard
+            data={dashboardData.insights}
+            isLoading={isLoading}
+          />
         </div>
 
         <motion.div
-          className="order-1 xl:order-2"
+          className="order-2"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut' }}
@@ -380,6 +367,226 @@ function HomePage() {
   );
 }
 
+function SpendingSnapshotCard({
+  data,
+  isLoading,
+}: {
+  data: ReportInsightsResponse | null;
+  isLoading: boolean;
+}) {
+  const animationKey = data
+    ? [
+        data.lastMonthAllExpense.totalPaise,
+        data.currentMonthAllExpense.totalPaise,
+        data.currentMonthNeedsWants.totalPaise,
+      ].join(':')
+    : 'loading';
+  const animationProgress = useDashboardAnimationProgress(animationKey);
+
+  if (isLoading && !data) {
+    return (
+      <section className="h-full rounded-lg border border-[#eadfd5] bg-white p-4 shadow-xl shadow-[#dfb49f]/15">
+        <div className="h-4 w-32 animate-pulse rounded-full bg-zinc-100" />
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_4.75rem] items-center gap-4 sm:grid-cols-[0.9fr_1.1fr_4.75rem]">
+          <div>
+            <div className="h-3 w-24 animate-pulse rounded-full bg-zinc-100" />
+            <div className="mt-3 h-7 w-28 animate-pulse rounded-full bg-zinc-100" />
+          </div>
+          <div className="col-span-2 space-y-3 sm:col-span-1">
+            <div className="h-2 w-full animate-pulse rounded-full bg-zinc-100" />
+            <div className="h-2 w-4/5 animate-pulse rounded-full bg-zinc-100" />
+          </div>
+          <div className="size-[4.75rem] animate-pulse rounded-full bg-zinc-100" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const previous = data.lastMonthAllExpense;
+  const current = data.currentMonthAllExpense;
+  const needsWants = data.currentMonthNeedsWants;
+  const comparisonMax = Math.max(
+    previous.totalPaise,
+    current.totalPaise,
+    1,
+  );
+  const currentBarWidth = Math.round(
+    (current.totalPaise / comparisonMax) * 100,
+  );
+  const previousBarWidth = Math.round(
+    (previous.totalPaise / comparisonMax) * 100,
+  );
+  const needsWantsShare = current.totalPaise
+    ? Math.min(
+        100,
+        Math.round((needsWants.totalPaise / current.totalPaise) * 100),
+      )
+    : 0;
+  const monthDifference = current.totalPaise - previous.totalPaise;
+  const animatedCurrentTotal = animateNumber(
+    current.totalPaise,
+    animationProgress,
+  );
+  const animatedDifference = animateNumber(
+    Math.abs(monthDifference),
+    animationProgress,
+  );
+  const needsWantsFill = needsWantsShare * animationProgress;
+  const animatedNeedsWantsShare = Math.round(needsWantsFill);
+  const comparisonText =
+    monthDifference === 0
+      ? `Same as ${previous.monthName}`
+      : `${formatInr(animatedDifference)} ${
+          monthDifference > 0 ? 'more' : 'less'
+        } than ${previous.monthName}`;
+
+  return (
+    <motion.section
+      animate={{ opacity: 1, y: 0 }}
+      className="h-full rounded-lg border border-[#eadfd5] bg-white p-4 shadow-xl shadow-[#dfb49f]/15"
+      initial={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-[#f36f4e]">
+            Spending snapshot
+          </p>
+          <h3 className="mt-0.5 text-base font-bold text-zinc-950">
+            Monthly comparison
+          </h3>
+        </div>
+        <span className="grid size-8 place-items-center rounded-md bg-[#fff0eb] text-[#f36f4e]">
+          <CircleDollarSign size={16} />
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_4.75rem] items-center gap-x-4 gap-y-3 sm:grid-cols-[0.9fr_1.1fr_4.75rem]">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-semibold text-zinc-500">
+            {current.monthName} total
+          </p>
+          <p className="mt-1.5 truncate text-2xl font-extrabold leading-none text-zinc-950">
+            {formatInr(animatedCurrentTotal)}
+          </p>
+          <p
+            className="mt-2 truncate text-[9px] font-semibold text-zinc-500"
+            title={comparisonText}
+          >
+            {comparisonText}
+          </p>
+        </div>
+
+        <div className="order-3 col-span-2 min-w-0 space-y-2.5 sm:order-none sm:col-span-1">
+          <SnapshotBar
+            color="bg-[#f36f4e]"
+            label={current.monthName}
+            progress={animationProgress}
+            value={current.totalPaise}
+            width={currentBarWidth}
+          />
+          <SnapshotBar
+            color="bg-[#66bfb6]"
+            label={previous.monthName}
+            progress={animationProgress}
+            value={previous.totalPaise}
+            width={previousBarWidth}
+          />
+        </div>
+
+        <div className="text-center">
+          <div
+            aria-label={`${needsWantsShare}% of this month's spending is Needs and Wants`}
+            className="grid size-[4.75rem] place-items-center rounded-full"
+            role="img"
+            style={{
+              background: `conic-gradient(#8d78d6 0 ${needsWantsFill}%, #eeeaf8 ${needsWantsFill}% 100%)`,
+              opacity: 0.65 + animationProgress * 0.35,
+              transform: `scale(${0.86 + animationProgress * 0.14})`,
+            }}
+          >
+            <div className="grid size-[3.75rem] place-items-center rounded-full bg-white">
+              <div>
+                <p className="text-base font-extrabold leading-none text-zinc-950">
+                  {animatedNeedsWantsShare}%
+                </p>
+                <p className="mt-1 text-[7px] font-bold uppercase text-[#5944a1]">
+                  N + W
+                </p>
+              </div>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[8px] font-semibold text-zinc-500">
+            Needs + Wants
+          </p>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function SnapshotBar({
+  color,
+  label,
+  progress,
+  value,
+  width,
+}: {
+  color: string;
+  label: string;
+  progress: number;
+  value: number;
+  width: number;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-[8px] font-bold text-zinc-500">
+        <span className="truncate">{label}</span>
+        <span className="shrink-0">
+          {formatInr(animateNumber(value, progress))}
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#f1eeeb]">
+        <span
+          className={`block h-full rounded-full ${color}`}
+          style={{ width: `${width * progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function useDashboardAnimationProgress(animationKey: string) {
+  const shouldReduceMotion = useReducedMotion();
+  const [progress, setProgress] = useState(shouldReduceMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      setProgress(1);
+      return;
+    }
+
+    setProgress(0);
+    const animation = animateMotionValue(0, 1, {
+      duration: 2.5,
+      ease: 'easeOut',
+      onUpdate: setProgress,
+    });
+
+    return () => animation.stop();
+  }, [animationKey, shouldReduceMotion]);
+
+  return progress;
+}
+
+function animateNumber(value: number, progress: number) {
+  return Math.round(value * progress);
+}
+
 function EmiOverviewCard({
   data,
   isLoading,
@@ -387,6 +594,18 @@ function EmiOverviewCard({
   data: EmiOverview | null;
   isLoading: boolean;
 }) {
+  const animationKey = data
+    ? [
+        data.activePlanCount,
+        data.paidInstallments,
+        data.remainingInstallments,
+        data.progressPercent,
+        data.monthlyCommitmentPaise,
+        data.remainingPaise,
+      ].join(':')
+    : 'loading';
+  const animationProgress = useDashboardAnimationProgress(animationKey);
+
   if (isLoading && !data) {
     return (
       <section className="h-full rounded-lg border border-[#d8e9e6] bg-white p-4 shadow-xl shadow-[#8dbbb4]/15">
@@ -414,6 +633,28 @@ function EmiOverviewCard({
   const progress = Math.min(100, Math.max(0, overview.progressPercent));
   const totalInstallments =
     overview.paidInstallments + overview.remainingInstallments;
+  const animatedActivePlanCount = animateNumber(
+    overview.activePlanCount,
+    animationProgress,
+  );
+  const progressFill = progress * animationProgress;
+  const animatedProgress = Math.round(progressFill);
+  const animatedMonthlyCommitment = animateNumber(
+    overview.monthlyCommitmentPaise,
+    animationProgress,
+  );
+  const animatedRemainingBalance = animateNumber(
+    overview.remainingPaise,
+    animationProgress,
+  );
+  const animatedPaidInstallments = animateNumber(
+    overview.paidInstallments,
+    animationProgress,
+  );
+  const animatedTotalInstallments = animateNumber(
+    totalInstallments,
+    animationProgress,
+  );
 
   return (
     <section className="h-full rounded-lg border border-[#d8e9e6] bg-white p-4 shadow-xl shadow-[#8dbbb4]/15">
@@ -424,8 +665,8 @@ function EmiOverviewCard({
           </p>
           <h3 className="mt-0.5 text-base font-bold text-zinc-950">
             {overview.activePlanCount
-              ? `${overview.activePlanCount} active EMI${
-                  overview.activePlanCount === 1 ? '' : 's'
+              ? `${animatedActivePlanCount} active EMI${
+                  animatedActivePlanCount === 1 ? '' : 's'
                 }`
               : 'No active EMIs'}
           </h3>
@@ -446,13 +687,15 @@ function EmiOverviewCard({
           className="grid size-[4.75rem] place-items-center rounded-full"
           role="img"
           style={{
-            background: `conic-gradient(#66bfb6 0 ${progress}%, #e7efed ${progress}% 100%)`,
+            background: `conic-gradient(#66bfb6 0 ${progressFill}%, #e7efed ${progressFill}% 100%)`,
+            opacity: 0.65 + animationProgress * 0.35,
+            transform: `scale(${0.86 + animationProgress * 0.14})`,
           }}
         >
           <div className="grid size-[3.75rem] place-items-center rounded-full bg-white text-center shadow-inner shadow-[#8dbbb4]/10">
             <div>
               <p className="text-xl font-extrabold leading-none text-zinc-950">
-                {progress}%
+                {animatedProgress}%
               </p>
               <p className="mt-1 text-[8px] font-bold uppercase text-zinc-500">
                 Paid
@@ -468,7 +711,7 @@ function EmiOverviewCard({
                 Monthly commitment
               </dt>
               <dd className="mt-0.5 truncate text-sm font-extrabold text-zinc-950">
-                {formatInr(overview.monthlyCommitmentPaise)}
+                {formatInr(animatedMonthlyCommitment)}
               </dd>
             </div>
             <div className="min-w-0 pt-2">
@@ -476,7 +719,7 @@ function EmiOverviewCard({
                 Remaining balance
               </dt>
               <dd className="mt-0.5 truncate text-sm font-bold text-zinc-900">
-                {formatInr(overview.remainingPaise)}
+                {formatInr(animatedRemainingBalance)}
               </dd>
             </div>
           </dl>
@@ -485,48 +728,19 @@ function EmiOverviewCard({
             <div className="flex items-center justify-between gap-2 text-[8px] font-bold text-zinc-500">
               <span>Installments paid</span>
               <span>
-                {overview.paidInstallments} of {totalInstallments}
+                {animatedPaidInstallments} of {animatedTotalInstallments}
               </span>
             </div>
             <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#e7efed]">
               <span
-                className="block h-full rounded-full bg-[#66bfb6] transition-[width] duration-500"
-                style={{ width: `${progress}%` }}
+                className="block h-full rounded-full bg-[#66bfb6]"
+                style={{ width: `${progress * animationProgress}%` }}
               />
             </div>
           </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function InsightCard({
-  icon: Icon,
-  insight,
-}: {
-  icon: typeof WalletCards;
-  insight: ReportInsight;
-}) {
-  return (
-    <div className="h-full min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/20">
-      <div className="flex min-h-[6.25rem] h-full flex-col justify-between">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <p
-            className="min-w-0 truncate whitespace-nowrap text-[11px] font-semibold leading-5 text-zinc-500 2xl:text-xs"
-            title={insight.label}
-          >
-            {insight.label}
-          </p>
-          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[#66bfb6] text-white shadow-md shadow-[#66bfb6]/25">
-            <Icon size={13} />
-          </span>
-        </div>
-        <p className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1rem,1.2vw,1.35rem)] font-extrabold leading-none tracking-tight text-zinc-950">
-          {formatInr(insight.totalPaise)}
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -565,17 +779,6 @@ function getCategoryCards(data: CurrentMonthCategoryCardsResponse | null) {
     normalizedName: categoryKey,
     totalPaise: 0,
   }));
-}
-
-function InsightSkeleton() {
-  return (
-    <div className="h-full min-w-0 flex-1 rounded-lg bg-white px-4 py-4 shadow-xl shadow-[#dfb49f]/15">
-      <div className="flex min-h-[6.25rem] h-full flex-col justify-between">
-        <div className="h-4 w-28 animate-pulse rounded-full bg-zinc-200" />
-        <div className="h-6 w-32 animate-pulse rounded-full bg-zinc-200" />
-      </div>
-    </div>
-  );
 }
 
 function ListSkeleton() {

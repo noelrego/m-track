@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import {
+  animate as animateMotionValue,
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import {
   CalendarClock,
   CheckCircle2,
@@ -12,26 +17,26 @@ import {
   Plus,
   RefreshCcw,
   Trash2,
-} from 'lucide-react';
-import { ExpenseCategoryKey } from '../../common';
+} from "lucide-react";
+import { ExpenseCategoryKey } from "../../common";
 import {
   apiFetch,
   getApiErrorMessage,
   readApiBody,
-} from '../../shared/api/api-client';
-import { Modal } from '../../shared/components/Modal';
-import { formatInr } from '../../shared/utils/money';
-import type { ExpenseItem } from '../expenses/expenses.types';
-import { AddExpenseModal } from '../home/AddExpenseModal';
-import { EmiDeleteModal } from './EmiDeleteModal';
-import { EmiInstallmentModal } from './EmiInstallmentModal';
+} from "../../shared/api/api-client";
+import { Modal } from "../../shared/components/Modal";
+import { formatInr } from "../../shared/utils/money";
+import type { ExpenseItem } from "../expenses/expenses.types";
+import { AddExpenseModal } from "../home/AddExpenseModal";
+import { EmiDeleteModal } from "./EmiDeleteModal";
+import { EmiInstallmentModal } from "./EmiInstallmentModal";
 import type {
   EmiEditScope,
   EmiInstallment,
   EmiPlanDetail,
   EmiPlanSummary,
   ListEmiPlansResponse,
-} from './emi.types';
+} from "./emi.types";
 
 interface DeleteTarget {
   installment: EmiInstallment;
@@ -49,30 +54,59 @@ async function fetchApi<T>(path: string, signal?: AbortSignal): Promise<T> {
   const data = await readApiBody(response);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, 'Unable to load EMIs.'));
+    throw new Error(getApiErrorMessage(data, "Unable to load EMIs."));
   }
 
   return data as T;
 }
 
+function useEmiAnimationProgress(animationKey: string) {
+  const shouldReduceMotion = useReducedMotion();
+  const [progress, setProgress] = useState(shouldReduceMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      setProgress(1);
+      return;
+    }
+
+    setProgress(0);
+    const animation = animateMotionValue(0, 1, {
+      duration: 1,
+      ease: "easeOut",
+      onUpdate: setProgress,
+    });
+
+    return () => animation.stop();
+  }, [animationKey, shouldReduceMotion]);
+
+  return progress;
+}
+
+function animateNumber(value: number, progress: number) {
+  return Math.round(value * progress);
+}
+
 function EmisPage() {
   const [data, setData] = useState<ListEmiPlansResponse | null>(null);
   const [expandedPlan, setExpandedPlan] = useState<EmiPlanDetail | null>(null);
-  const [loadingPlanId, setLoadingPlanId] = useState('');
-  const [legacyExpenses, setLegacyExpenses] = useState<ExpenseItem[] | null>(null);
+  const [loadingPlanId, setLoadingPlanId] = useState("");
+  const [legacyExpenses, setLegacyExpenses] = useState<ExpenseItem[] | null>(
+    null,
+  );
   const [isLoadingLegacy, setIsLoadingLegacy] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingInstallment, setEditingInstallment] =
     useState<EmiInstallment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [deleteScope, setDeleteScope] = useState<EmiEditScope>('single');
+  const [deleteScope, setDeleteScope] = useState<EmiEditScope>("single");
   const [metadataTarget, setMetadataTarget] =
     useState<PlanMetadataTarget | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
-  const [error, setError] = useState('');
-  const [modalError, setModalError] = useState('');
+  const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,10 +117,10 @@ function EmisPage() {
 
   async function loadPlans(signal?: AbortSignal) {
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const nextData = await fetchApi<ListEmiPlansResponse>('/emis', signal);
+      const nextData = await fetchApi<ListEmiPlansResponse>("/emis", signal);
 
       if (!signal?.aborted) {
         setData(nextData);
@@ -94,7 +128,9 @@ function EmisPage() {
     } catch (requestError) {
       if (!signal?.aborted) {
         setError(
-          requestError instanceof Error ? requestError.message : 'Unable to load EMIs.',
+          requestError instanceof Error
+            ? requestError.message
+            : "Unable to load EMIs.",
         );
       }
     } finally {
@@ -111,30 +147,32 @@ function EmisPage() {
     }
 
     setLoadingPlanId(planId);
-    setError('');
+    setError("");
 
     try {
       setExpandedPlan(await fetchApi<EmiPlanDetail>(`/emis/${planId}`));
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : 'Unable to load EMI.',
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to load EMI.",
       );
     } finally {
-      setLoadingPlanId('');
+      setLoadingPlanId("");
     }
   }
 
   async function loadLegacyExpenses() {
     setIsLoadingLegacy(true);
-    setError('');
+    setError("");
 
     try {
-      setLegacyExpenses(await fetchApi<ExpenseItem[]>('/emis/legacy'));
+      setLegacyExpenses(await fetchApi<ExpenseItem[]>("/emis/legacy"));
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : 'Unable to load previous EMI records.',
+          : "Unable to load previous EMI records.",
       );
     } finally {
       setIsLoadingLegacy(false);
@@ -152,27 +190,31 @@ function EmisPage() {
     }
 
     setIsDeleting(true);
-    setModalError('');
+    setModalError("");
 
     try {
       const query = new URLSearchParams({ scope: deleteScope });
       const response = await apiFetch(
         `/emis/${deleteTarget.plan.id}/installments/${deleteTarget.installment.id}?${query.toString()}`,
-        { method: 'DELETE' },
+        { method: "DELETE" },
       );
       const responseData = await readApiBody(response);
 
       if (!response.ok) {
-        setModalError(getApiErrorMessage(responseData, 'Unable to delete EMI.'));
+        setModalError(
+          getApiErrorMessage(responseData, "Unable to delete EMI."),
+        );
         return;
       }
 
-      const detail = await fetchApi<EmiPlanDetail>(`/emis/${deleteTarget.plan.id}`);
+      const detail = await fetchApi<EmiPlanDetail>(
+        `/emis/${deleteTarget.plan.id}`,
+      );
       setDeleteTarget(null);
       setExpandedPlan(detail);
       void loadPlans();
     } catch {
-      setModalError('Unable to reach the API. Please try again.');
+      setModalError("Unable to reach the API. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -182,16 +224,16 @@ function EmisPage() {
     event.preventDefault();
 
     if (!metadataTarget || !metadataTarget.name.trim()) {
-      setModalError('Enter an EMI name.');
+      setModalError("Enter an EMI name.");
       return;
     }
 
     setIsSavingMetadata(true);
-    setModalError('');
+    setModalError("");
 
     try {
       const response = await apiFetch(`/emis/${metadataTarget.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({
           name: metadataTarget.name.trim(),
           lender: metadataTarget.lender.trim(),
@@ -200,16 +242,20 @@ function EmisPage() {
       const responseData = await readApiBody(response);
 
       if (!response.ok) {
-        setModalError(getApiErrorMessage(responseData, 'Unable to update EMI.'));
+        setModalError(
+          getApiErrorMessage(responseData, "Unable to update EMI."),
+        );
         return;
       }
 
       const detail = responseData as EmiPlanDetail;
       setMetadataTarget(null);
-      setExpandedPlan((current) => (current?.id === detail.id ? detail : current));
+      setExpandedPlan((current) =>
+        current?.id === detail.id ? detail : current,
+      );
       void loadPlans();
     } catch {
-      setModalError('Unable to reach the API. Please try again.');
+      setModalError("Unable to reach the API. Please try again.");
     } finally {
       setIsSavingMetadata(false);
     }
@@ -221,8 +267,12 @@ function EmisPage() {
     <section className="space-y-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase text-[#f36f4e]">SpendWise</p>
-          <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">EMIs</h2>
+          <p className="text-sm font-semibold uppercase text-[#f36f4e]">
+            SpendWise
+          </p>
+          <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">
+            EMIs
+          </h2>
         </div>
 
         <div className="flex gap-2">
@@ -234,7 +284,7 @@ function EmisPage() {
             title="Refresh EMIs"
             type="button"
           >
-            <RefreshCcw className={isLoading ? 'animate-spin' : ''} size={16} />
+            <RefreshCcw className={isLoading ? "animate-spin" : ""} size={16} />
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-md bg-[#f36f4e] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
@@ -271,16 +321,16 @@ function EmisPage() {
                 if (!expandedPlan) {
                   return;
                 }
-                setDeleteScope('single');
-                setModalError('');
+                setDeleteScope("single");
+                setModalError("");
                 setDeleteTarget({ installment, plan: expandedPlan });
               }}
               onEdit={(installment) => setEditingInstallment(installment)}
               onEditMetadata={() => {
-                setModalError('');
+                setModalError("");
                 setMetadataTarget({
                   id: plan.id,
-                  lender: plan.lender ?? '',
+                  lender: plan.lender ?? "",
                   name: plan.name,
                 });
               }}
@@ -294,7 +344,9 @@ function EmisPage() {
           <div className="mx-auto grid size-12 place-items-center rounded-md bg-[#edf9f7] text-[#287d75]">
             <Landmark size={20} />
           </div>
-          <p className="mt-3 text-sm font-bold text-zinc-800">No EMI plans yet</p>
+          <p className="mt-3 text-sm font-bold text-zinc-800">
+            No EMI plans yet
+          </p>
           <button
             className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-[#f36f4e] px-3 py-2 text-xs font-bold text-white"
             onClick={() => setIsAddOpen(true)}
@@ -310,10 +362,12 @@ function EmisPage() {
         <section className="border-t border-[#eadfd5] pt-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-zinc-950">Previous EMI entries</h3>
+              <h3 className="text-lg font-bold text-zinc-950">
+                Previous EMI entries
+              </h3>
               <p className="mt-1 text-xs text-zinc-500">
                 {data?.legacyExpenseCount} ungrouped record
-                {data?.legacyExpenseCount === 1 ? '' : 's'}
+                {data?.legacyExpenseCount === 1 ? "" : "s"}
               </p>
             </div>
             {legacyExpenses === null ? (
@@ -323,7 +377,9 @@ function EmisPage() {
                 onClick={loadLegacyExpenses}
                 type="button"
               >
-                {isLoadingLegacy ? <Loader2 className="animate-spin" size={14} /> : null}
+                {isLoadingLegacy ? (
+                  <Loader2 className="animate-spin" size={14} />
+                ) : null}
                 View records
               </button>
             ) : null}
@@ -397,6 +453,23 @@ function EmiPlanRow({
   const progress = plan.installmentCount
     ? Math.round((plan.paidInstallments / plan.installmentCount) * 100)
     : 0;
+  const animationKey = [
+    plan.id,
+    plan.installmentCount,
+    plan.paidInstallments,
+    plan.remainingInstallments,
+    plan.remainingPaise,
+  ].join(":");
+  const animationProgress = useEmiAnimationProgress(animationKey);
+  const animatedProgress = Math.round(progress * animationProgress);
+  const animatedRemainingPaise = animateNumber(
+    plan.remainingPaise,
+    animationProgress,
+  );
+  const animatedRemainingInstallments = animateNumber(
+    plan.remainingInstallments,
+    animationProgress,
+  );
 
   return (
     <article className="overflow-hidden rounded-lg border border-[#eadfd5] bg-white shadow-lg shadow-[#dfb49f]/10">
@@ -408,18 +481,23 @@ function EmiPlanRow({
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-lg font-bold text-zinc-950">{plan.name}</h3>
+                <h3 className="truncate text-lg font-bold text-zinc-950">
+                  {plan.name}
+                </h3>
                 <StatusBadge status={plan.status} />
               </div>
               <p className="mt-1 text-xs text-zinc-500">
-                {plan.lender || 'No lender'} · {formatDate(plan.startDate)} to{' '}
+                {plan.lender || "No lender"} · {formatDate(plan.startDate)} to{" "}
                 {formatDate(plan.endDate)}
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:min-w-[620px]">
-            <Summary label="Monthly" value={formatInr(plan.currentMonthlyPaise)} />
+            <Summary
+              label="Monthly"
+              value={formatInr(plan.currentMonthlyPaise)}
+            />
             <Summary
               label="Paid"
               value={`${formatInr(plan.paidPaise)} · ${plan.paidInstallments} mo`}
@@ -427,12 +505,16 @@ function EmiPlanRow({
             />
             <Summary
               label="Remaining"
-              value={`${formatInr(plan.remainingPaise)} · ${plan.remainingInstallments} mo`}
+              value={`${formatInr(animatedRemainingPaise)} · ${animatedRemainingInstallments} mo`}
               valueClass="text-[#b1462d]"
             />
             <Summary
               label="Next"
-              value={plan.nextPaymentDate ? formatDate(plan.nextPaymentDate) : 'Complete'}
+              value={
+                plan.nextPaymentDate
+                  ? formatDate(plan.nextPaymentDate)
+                  : "Complete"
+              }
             />
           </div>
         </div>
@@ -440,11 +522,13 @@ function EmiPlanRow({
         <div className="mt-4 flex items-center gap-3">
           <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100">
             <div
-              className="h-full rounded-full bg-[#66bfb6] transition-[width]"
-              style={{ width: `${progress}%` }}
+              className="h-full rounded-full bg-[#66bfb6]"
+              style={{ width: `${progress * animationProgress}%` }}
             />
           </div>
-          <span className="shrink-0 text-[11px] font-bold text-zinc-500">{progress}%</span>
+          <span className="shrink-0 text-[11px] font-bold text-zinc-500">
+            {animatedProgress}%
+          </span>
           <button
             aria-label={`Edit ${plan.name}`}
             className="grid size-8 place-items-center rounded-md border border-zinc-200 text-zinc-500 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e]"
@@ -455,11 +539,11 @@ function EmiPlanRow({
             <Pencil size={14} />
           </button>
           <button
-            aria-label={detail ? 'Hide installments' : 'View installments'}
+            aria-label={detail ? "Hide installments" : "View installments"}
             className="grid size-8 place-items-center rounded-md border border-zinc-200 text-zinc-500 transition hover:border-[#66bfb6] hover:text-[#287d75]"
             disabled={isLoading}
             onClick={onToggle}
-            title={detail ? 'Hide installments' : 'View installments'}
+            title={detail ? "Hide installments" : "View installments"}
             type="button"
           >
             {isLoading ? (
@@ -476,7 +560,7 @@ function EmiPlanRow({
       <AnimatePresence initial={false}>
         {detail ? (
           <motion.div
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             className="overflow-hidden border-t border-[#eadfd5]"
             exit={{ height: 0, opacity: 0 }}
             initial={{ height: 0, opacity: 0 }}
@@ -520,9 +604,12 @@ function InstallmentTable({
             installments.map((installment) => (
               <tr className="hover:bg-[#fffaf6]" key={installment.id}>
                 <td className="px-5 py-3">
-                  <p className="font-bold text-zinc-800">{formatMonth(installment.date)}</p>
+                  <p className="font-bold text-zinc-800">
+                    {formatMonth(installment.date)}
+                  </p>
                   <p className="mt-0.5 text-[11px] text-zinc-400">
-                    {installment.installmentNumber} / {installment.installmentCount}
+                    {installment.installmentNumber} /{" "}
+                    {installment.installmentCount}
                   </p>
                 </td>
                 <td className="px-5 py-3 font-bold text-zinc-950">
@@ -531,14 +618,18 @@ function InstallmentTable({
                 <td className="px-5 py-3">
                   <span
                     className={[
-                      'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold leading-none',
+                      "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold leading-none",
                       installment.isPaid
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-amber-50 text-amber-700',
-                    ].join(' ')}
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700",
+                    ].join(" ")}
                   >
-                    {installment.isPaid ? <CheckCircle2 size={11} /> : <CalendarClock size={11} />}
-                    {installment.isPaid ? 'Paid' : 'Upcoming'}
+                    {installment.isPaid ? (
+                      <CheckCircle2 size={11} />
+                    ) : (
+                      <CalendarClock size={11} />
+                    )}
+                    {installment.isPaid ? "Paid" : "Upcoming"}
                   </span>
                 </td>
                 <td className="max-w-[160px] px-5 py-3">
@@ -556,12 +647,17 @@ function InstallmentTable({
                         +{installment.tags.length - 2}
                       </span>
                     ) : null}
-                    {!installment.tags.length ? <span className="text-zinc-300">-</span> : null}
+                    {!installment.tags.length ? (
+                      <span className="text-zinc-300">-</span>
+                    ) : null}
                   </div>
                 </td>
                 <td className="max-w-[180px] px-5 py-3">
-                  <p className="truncate text-xs text-zinc-500" title={installment.note ?? ''}>
-                    {installment.note || '-'}
+                  <p
+                    className="truncate text-xs text-zinc-500"
+                    title={installment.note ?? ""}
+                  >
+                    {installment.note || "-"}
                   </p>
                 </td>
                 <td className="px-5 py-3">
@@ -590,7 +686,10 @@ function InstallmentTable({
             ))
           ) : (
             <tr>
-              <td className="px-5 py-8 text-center text-sm text-zinc-500" colSpan={6}>
+              <td
+                className="px-5 py-8 text-center text-sm text-zinc-500"
+                colSpan={6}
+              >
                 No installments remain.
               </td>
             </tr>
@@ -616,13 +715,17 @@ function LegacyExpenses({ expenses }: { expenses: ExpenseItem[] }) {
         <tbody className="divide-y divide-[#f1e8df]">
           {expenses.map((expense) => (
             <tr key={expense.id}>
-              <td className="px-4 py-3 font-semibold text-zinc-700">{formatDate(expense.date)}</td>
-              <td className="px-4 py-3 font-bold text-zinc-950">{formatInr(expense.amountPaise)}</td>
+              <td className="px-4 py-3 font-semibold text-zinc-700">
+                {formatDate(expense.date)}
+              </td>
+              <td className="px-4 py-3 font-bold text-zinc-950">
+                {formatInr(expense.amountPaise)}
+              </td>
               <td className="px-4 py-3 text-xs text-zinc-500">
-                {expense.tags.map((tag) => tag.name).join(', ') || '-'}
+                {expense.tags.map((tag) => tag.name).join(", ") || "-"}
               </td>
               <td className="max-w-[260px] px-4 py-3 text-xs text-zinc-500">
-                <p className="truncate">{expense.note || '-'}</p>
+                <p className="truncate">{expense.note || "-"}</p>
               </td>
             </tr>
           ))}
@@ -648,7 +751,11 @@ function PlanMetadataModal({
   target: PlanMetadataTarget | null;
 }) {
   return (
-    <Modal isOpen={Boolean(target)} onClose={isSaving ? () => undefined : onClose} title="Edit EMI details">
+    <Modal
+      isOpen={Boolean(target)}
+      onClose={isSaving ? () => undefined : onClose}
+      title="Edit EMI details"
+    >
       <form className="space-y-4" onSubmit={onSubmit}>
         <label className="block">
           <span className="text-xs font-semibold text-zinc-800">EMI name</span>
@@ -659,7 +766,7 @@ function PlanMetadataModal({
               target && onChange({ ...target, name: event.target.value })
             }
             required
-            value={target?.name ?? ''}
+            value={target?.name ?? ""}
           />
         </label>
         <label className="block">
@@ -670,7 +777,7 @@ function PlanMetadataModal({
             onChange={(event) =>
               target && onChange({ ...target, lender: event.target.value })
             }
-            value={target?.lender ?? ''}
+            value={target?.lender ?? ""}
           />
         </label>
         {error ? (
@@ -692,7 +799,11 @@ function PlanMetadataModal({
             disabled={isSaving}
             type="submit"
           >
-            {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Pencil size={14} />}
+            {isSaving ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : (
+              <Pencil size={14} />
+            )}
             Save
           </button>
         </div>
@@ -704,7 +815,7 @@ function PlanMetadataModal({
 function Summary({
   label,
   value,
-  valueClass = 'text-zinc-900',
+  valueClass = "text-zinc-900",
 }: {
   label: string;
   value: string;
@@ -713,23 +824,28 @@ function Summary({
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-bold uppercase text-zinc-400">{label}</p>
-      <p className={`mt-1 truncate text-xs font-bold ${valueClass}`} title={value}>
+      <p
+        className={`mt-1 truncate text-xs font-bold ${valueClass}`}
+        title={value}
+      >
         {value}
       </p>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: EmiPlanSummary['status'] }) {
+function StatusBadge({ status }: { status: EmiPlanSummary["status"] }) {
   const style =
-    status === 'active'
-      ? 'bg-blue-50 text-blue-700'
-      : status === 'completed'
-        ? 'bg-emerald-50 text-emerald-700'
-        : 'bg-zinc-100 text-zinc-600';
+    status === "active"
+      ? "bg-blue-50 text-blue-700"
+      : status === "completed"
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-zinc-100 text-zinc-600";
 
   return (
-    <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase leading-none ${style}`}>
+    <span
+      className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase leading-none ${style}`}
+    >
       {status}
     </span>
   );
@@ -737,16 +853,16 @@ function StatusBadge({ status }: { status: EmiPlanSummary['status'] }) {
 
 function formatDate(dateValue: string) {
   return new Intl.DateTimeFormat(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   }).format(new Date(`${dateValue}T00:00:00`));
 }
 
 function formatMonth(dateValue: string) {
   return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    year: 'numeric',
+    month: "short",
+    year: "numeric",
   }).format(new Date(`${dateValue}T00:00:00`));
 }
 
