@@ -46,6 +46,23 @@ export interface MonthlyCategoryExpenseTrendResponse {
   categories: MonthlyCategoryExpenseSeries[];
 }
 
+export interface MonthlyTagExpenseTrendSeries {
+  tagId: string;
+  tagName: string;
+  months: MonthlyCategoryExpensePoint[];
+}
+
+export interface MonthlyTagExpenseTrendResponse {
+  year: number;
+  monthCount: MonthlyExpenseWindow;
+  rangeLabel: string;
+  startDate: string;
+  endDate: string;
+  months: YearlyMonthlyExpenseItem[];
+  selectedTagIds: string[];
+  tags: MonthlyTagExpenseTrendSeries[];
+}
+
 export interface ReportTagOption {
   id: string;
   name: string;

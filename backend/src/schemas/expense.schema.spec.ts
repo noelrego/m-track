@@ -53,4 +53,16 @@ describe('ExpenseSchema EMI compatibility', () => {
       unique: true,
     });
   });
+
+  it('indexes owner tag trend lookups across the selected date window', () => {
+    const tagTrendIndex = ExpenseSchema.indexes().find(
+      ([fields]) => fields.tagIds === 1 && fields.spentAt === 1,
+    );
+
+    expect(tagTrendIndex?.[0]).toEqual({
+      ownerUserId: 1,
+      tagIds: 1,
+      spentAt: 1,
+    });
+  });
 });

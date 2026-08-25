@@ -1,9 +1,35 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsMongoId, IsOptional, Matches } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsMongoId,
+  IsOptional,
+  Matches,
+} from 'class-validator';
 import { ExpenseCategoryKey } from '../enums/category.enum';
 
 const monthKeyPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function toStringArray(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => (typeof item === 'string' ? item.split(',') : []))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export class MonthlyExpenseWindowQueryDto {
   @ApiPropertyOptional({
@@ -33,26 +59,23 @@ export class MonthlyTagExpenseReportQueryDto {
     example: '665d2fb4d5f6a0a42f1f9a21,665d2fb4d5f6a0a42f1f9a22',
     type: String,
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value
-        .flatMap((item) => (typeof item === 'string' ? item.split(',') : []))
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    return value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  })
+  @Transform(({ value }) => toStringArray(value))
   @IsOptional()
   @IsMongoId({ each: true })
   tagIds?: string[];
+}
+
+export class MonthlyTagExpenseTrendQueryDto extends MonthlyExpenseWindowQueryDto {
+  @ApiProperty({
+    description: 'Comma-separated user-owned tag ids to include in the trend.',
+    example: '665d2fb4d5f6a0a42f1f9a21,665d2fb4d5f6a0a42f1f9a22',
+    type: String,
+  })
+  @Transform(({ value }) => toStringArray(value))
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsMongoId({ each: true })
+  tagIds: string[];
 }
 
 export class ReportInsightDto {
@@ -308,6 +331,63 @@ export class MonthlyCategoryExpenseTrendResponseDto {
 
   @ApiProperty({ type: () => [MonthlyCategoryExpenseSeriesDto] })
   categories: MonthlyCategoryExpenseSeriesDto[];
+}
+
+export class MonthlyTagExpenseTrendPointDto {
+  @ApiProperty({ example: 5 })
+  monthNumber: number;
+
+  @ApiProperty({ example: '2026-05' })
+  monthKey: string;
+
+  @ApiProperty({ example: 'May 2026' })
+  monthName: string;
+
+  @ApiProperty({ example: 'May' })
+  label: string;
+
+  @ApiProperty({ example: 125000 })
+  totalPaise: number;
+
+  @ApiProperty({ example: 8 })
+  count: number;
+}
+
+export class MonthlyTagExpenseTrendSeriesDto {
+  @ApiProperty({ example: '665d2fb4d5f6a0a42f1f9a21' })
+  tagId: string;
+
+  @ApiProperty({ example: 'UPI' })
+  tagName: string;
+
+  @ApiProperty({ type: () => [MonthlyTagExpenseTrendPointDto] })
+  months: MonthlyTagExpenseTrendPointDto[];
+}
+
+export class MonthlyTagExpenseTrendResponseDto {
+  @ApiProperty({ example: 2026 })
+  year: number;
+
+  @ApiProperty({ example: 5 })
+  monthCount: number;
+
+  @ApiProperty({ example: 'Last 5 months' })
+  rangeLabel: string;
+
+  @ApiProperty({ example: '2026-01-01' })
+  startDate: string;
+
+  @ApiProperty({ example: '2026-05-31' })
+  endDate: string;
+
+  @ApiProperty({ type: () => [YearlyMonthlyExpenseItemDto] })
+  months: YearlyMonthlyExpenseItemDto[];
+
+  @ApiProperty({ isArray: true, type: String })
+  selectedTagIds: string[];
+
+  @ApiProperty({ type: () => [MonthlyTagExpenseTrendSeriesDto] })
+  tags: MonthlyTagExpenseTrendSeriesDto[];
 }
 
 export class MonthlyTagExpenseItemDto {

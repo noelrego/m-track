@@ -66,16 +66,23 @@ function getMonthLabel(monthKey: string) {
   }).format(date);
 }
 
-export function MonthlyTagReport() {
-  const [tags, setTags] = useState<ReportTagOption[]>([]);
+interface MonthlyTagReportProps {
+  isLoadingTags: boolean;
+  tagError: string;
+  tags: ReportTagOption[];
+}
+
+export function MonthlyTagReport({
+  isLoadingTags,
+  tagError,
+  tags,
+}: MonthlyTagReportProps) {
   const [selectedMonthKey, setSelectedMonthKey] = useState(getCurrentMonthKey);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState('');
   const [report, setReport] =
     useState<MonthlyTagExpenseReportResponse | null>(null);
-  const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
-  const [tagError, setTagError] = useState('');
   const [reportError, setReportError] = useState('');
 
   const selectedYear = Number(selectedMonthKey.slice(0, 4));
@@ -110,20 +117,6 @@ export function MonthlyTagReport() {
   const reportTotal = report?.totalPaise ?? 0;
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    void loadTags(controller.signal);
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!tags.length) {
-      return;
-    }
-
     const availableTagIds = new Set(tags.map((tag) => tag.id));
 
     setSelectedTagIds((currentTagIds) =>
@@ -147,31 +140,6 @@ export function MonthlyTagReport() {
       controller.abort();
     };
   }, [selectedMonthKey, selectedTagQuery]);
-
-  async function loadTags(signal?: AbortSignal) {
-    setIsLoadingTags(true);
-    setTagError('');
-
-    try {
-      const tagsData = await fetchApi<ReportTagOption[]>('/tags', signal);
-
-      if (!signal?.aborted) {
-        setTags(Array.isArray(tagsData) ? tagsData : []);
-      }
-    } catch (requestError) {
-      if (!signal?.aborted) {
-        setTagError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'Unable to load tags.',
-        );
-      }
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoadingTags(false);
-      }
-    }
-  }
 
   async function loadReport(signal?: AbortSignal) {
     setIsLoadingReport(true);
@@ -229,7 +197,7 @@ export function MonthlyTagReport() {
       className="w-full rounded-lg border border-[#eadfd5] bg-white p-5 shadow-xl shadow-[#dfb49f]/15 sm:p-6"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: 'easeOut', delay: 0.08 }}
+      transition={{ duration: 0.28, ease: 'easeOut', delay: 0.16 }}
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>

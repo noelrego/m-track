@@ -24,6 +24,7 @@ export class Category {
     required: true,
     lowercase: true,
     trim: true,
+    type: String,
     unique: true,
     index: true,
   })

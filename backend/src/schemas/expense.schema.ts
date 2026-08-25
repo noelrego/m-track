@@ -86,6 +86,7 @@ export const ExpenseSchema = SchemaFactory.createForClass(Expense);
 ExpenseSchema.index({ ownerUserId: 1, spentAt: -1, createdAt: -1 });
 ExpenseSchema.index({ ownerUserId: 1, monthKey: 1 });
 ExpenseSchema.index({ ownerUserId: 1, monthKey: 1, categoryId: 1 });
+ExpenseSchema.index({ ownerUserId: 1, tagIds: 1, spentAt: 1 });
 ExpenseSchema.index(
   { ownerUserId: 1, emiPlanId: 1, emiInstallmentNumber: 1 },
   {

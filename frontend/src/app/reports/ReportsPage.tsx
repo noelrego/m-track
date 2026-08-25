@@ -12,10 +12,12 @@ import type {
   CurrentYearMonthlyExpenseResponse,
   MonthlyCategoryExpenseTrendResponse,
   MonthlyExpenseWindow,
+  ReportTagOption,
 } from './reports.types';
 import { CategoryExpenseLineChart } from './CategoryExpenseLineChart';
 import { CategorySpendingDonut } from './CategorySpendingDonut';
 import { MonthlyTagReport } from './MonthlyTagReport';
+import { TagExpenseTrendReport } from './TagExpenseTrendReport';
 import { YearlyExpenseLineChart } from './YearlyExpenseLineChart';
 
 const monthlyExpenseWindowOptions: {
@@ -27,12 +29,16 @@ const monthlyExpenseWindowOptions: {
   { label: 'Last 12 months', value: 12 },
 ];
 
-async function fetchReport<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function fetchReport<T>(
+  path: string,
+  signal?: AbortSignal,
+  fallbackMessage = 'Unable to load report data.',
+): Promise<T> {
   const response = await apiFetch(path, { signal });
   const data = await readApiBody(response);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, 'Unable to load report data.'));
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
   }
 
   return data as T;
@@ -48,8 +54,21 @@ function ReportsPage() {
   const [selectedCategory, setSelectedCategory] = useState<
     ExpenseCategoryKey | 'all'
   >('all');
+  const [reportTags, setReportTags] = useState<ReportTagOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [error, setError] = useState('');
+  const [tagError, setTagError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void loadReportTags(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -131,6 +150,35 @@ function ReportsPage() {
     } finally {
       if (!signal?.aborted) {
         setIsLoading(false);
+      }
+    }
+  }
+
+  async function loadReportTags(signal?: AbortSignal) {
+    setIsLoadingTags(true);
+    setTagError('');
+
+    try {
+      const tagsData = await fetchReport<ReportTagOption[]>(
+        '/tags',
+        signal,
+        'Unable to load tags.',
+      );
+
+      if (!signal?.aborted) {
+        setReportTags(Array.isArray(tagsData) ? tagsData : []);
+      }
+    } catch (requestError) {
+      if (!signal?.aborted) {
+        setTagError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load tags.',
+        );
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoadingTags(false);
       }
     }
   }
@@ -308,7 +356,19 @@ function ReportsPage() {
         )}
       </motion.section>
 
-      <MonthlyTagReport />
+      <TagExpenseTrendReport
+        isLoadingTags={isLoadingTags}
+        monthWindow={selectedMonthWindow}
+        rangeLabel={selectedWindowLabel}
+        tagError={tagError}
+        tags={reportTags}
+      />
+
+      <MonthlyTagReport
+        isLoadingTags={isLoadingTags}
+        tagError={tagError}
+        tags={reportTags}
+      />
     </section>
   );
 }

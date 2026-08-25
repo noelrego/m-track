@@ -11,6 +11,7 @@ import {
   ExpenseCategoryKey,
   MonthlyCategoryExpenseTrendResponseDto,
   MonthlyTagExpenseReportResponseDto,
+  MonthlyTagExpenseTrendResponseDto,
   ReportCategoryAmountDto,
   ReportInsightDto,
   ReportInsightsResponseDto,
@@ -62,6 +63,15 @@ interface CategoryMonthAggregate {
 
 interface TagAggregate {
   _id: string;
+  count: number;
+  totalPaise: number;
+}
+
+interface TagMonthAggregate {
+  _id: {
+    monthKey: string;
+    tagId: string;
+  };
   count: number;
   totalPaise: number;
 }
@@ -425,6 +435,107 @@ export class ReportService {
       this.logger.error(error, 'Report monthly category trend failed', {
         monthCount: monthTrendRange.monthCount,
         ownerUserId,
+      });
+      throw error;
+    }
+  }
+
+  async getMonthlyTagExpenseTrend(
+    ownerUserId: string,
+    monthCount = DEFAULT_MONTHLY_EXPENSE_MONTH_COUNT,
+    tagIds: string[] = [],
+  ): Promise<MonthlyTagExpenseTrendResponseDto> {
+    const monthTrendRange = this.getRecentMonthTrendRange(monthCount);
+    const requestedTagIds = this.toUniqueObjectIds(tagIds);
+
+    try {
+      if (!requestedTagIds.length) {
+        return this.toEmptyMonthlyTagExpenseTrend(monthTrendRange);
+      }
+
+      const tags = await this.tagModel
+        .find({ _id: { $in: requestedTagIds }, ownerUserId })
+        .exec();
+      const tagsById = new Map(
+        tags.map((tag) => [tag.id, { id: tag.id, name: tag.name }]),
+      );
+      const selectedTags = requestedTagIds
+        .map((tagId) => tagsById.get(tagId))
+        .filter((tag): tag is SelectedTag => Boolean(tag));
+      const selectedTagIds = selectedTags.map((tag) => tag.id);
+
+      if (!selectedTagIds.length) {
+        return this.toEmptyMonthlyTagExpenseTrend(monthTrendRange);
+      }
+
+      const aggregates = await this.expenseModel
+        .aggregate<TagMonthAggregate>([
+          {
+            $match: {
+              ownerUserId,
+              spentAt: {
+                $gte: monthTrendRange.start,
+                $lt: monthTrendRange.end,
+              },
+              tagIds: { $in: selectedTagIds },
+            },
+          },
+          { $unwind: '$tagIds' },
+          { $match: { tagIds: { $in: selectedTagIds } } },
+          {
+            $group: {
+              _id: {
+                monthKey: '$monthKey',
+                tagId: '$tagIds',
+              },
+              count: { $sum: 1 },
+              totalPaise: { $sum: '$amountPaise' },
+            },
+          },
+        ])
+        .exec();
+      const aggregateMap = new Map(
+        aggregates.map((aggregate) => [
+          this.toTagMonthKey(aggregate._id.tagId, aggregate._id.monthKey),
+          aggregate,
+        ]),
+      );
+
+      return {
+        year:
+          monthTrendRange.months[
+            monthTrendRange.months.length - 1
+          ]?.start.getUTCFullYear() ?? new Date().getUTCFullYear(),
+        monthCount: monthTrendRange.monthCount,
+        rangeLabel: `Last ${monthTrendRange.monthCount} months`,
+        startDate: monthTrendRange.startDate,
+        endDate: monthTrendRange.endDate,
+        months: this.toMonthlyExpenseItems(monthTrendRange, new Map()),
+        selectedTagIds,
+        tags: selectedTags.map((tag) => ({
+          tagId: tag.id,
+          tagName: tag.name,
+          months: monthTrendRange.months.map((monthRange) => {
+            const aggregate = aggregateMap.get(
+              this.toTagMonthKey(tag.id, monthRange.monthKey),
+            );
+
+            return {
+              monthNumber: monthRange.start.getUTCMonth() + 1,
+              monthKey: monthRange.monthKey,
+              monthName: monthRange.monthName,
+              label: this.formatMonthShortName(monthRange.start),
+              totalPaise: aggregate?.totalPaise ?? 0,
+              count: aggregate?.count ?? 0,
+            };
+          }),
+        })),
+      };
+    } catch (error) {
+      this.logger.error(error, 'Report monthly tag trend failed', {
+        monthCount: monthTrendRange.monthCount,
+        ownerUserId,
+        tagCount: requestedTagIds.length,
       });
       throw error;
     }
@@ -945,6 +1056,10 @@ export class ReportService {
     return `${categoryId}:${monthKey}`;
   }
 
+  private toTagMonthKey(tagId: string, monthKey: string): string {
+    return `${tagId}:${monthKey}`;
+  }
+
   private toUniqueObjectIds(ids: string[]): string[] {
     return Array.from(new Set(ids.filter((id) => isValidObjectId(id))));
   }
@@ -960,6 +1075,24 @@ export class ReportService {
       selectedTagIds: [],
       totalPaise: 0,
       count: 0,
+      tags: [],
+    };
+  }
+
+  private toEmptyMonthlyTagExpenseTrend(
+    monthTrendRange: MonthTrendRange,
+  ): MonthlyTagExpenseTrendResponseDto {
+    return {
+      year:
+        monthTrendRange.months[
+          monthTrendRange.months.length - 1
+        ]?.start.getUTCFullYear() ?? new Date().getUTCFullYear(),
+      monthCount: monthTrendRange.monthCount,
+      rangeLabel: `Last ${monthTrendRange.monthCount} months`,
+      startDate: monthTrendRange.startDate,
+      endDate: monthTrendRange.endDate,
+      months: this.toMonthlyExpenseItems(monthTrendRange, new Map()),
+      selectedTagIds: [],
       tags: [],
     };
   }

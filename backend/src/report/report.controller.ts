@@ -16,6 +16,8 @@ import {
   MonthlyExpenseWindowQueryDto,
   MonthlyTagExpenseReportQueryDto,
   MonthlyTagExpenseReportResponseDto,
+  MonthlyTagExpenseTrendQueryDto,
+  MonthlyTagExpenseTrendResponseDto,
   ReportInsightsResponseDto,
 } from '../common';
 import { ReportService } from './report.service';
@@ -120,6 +122,27 @@ export class ReportController {
     return this.reportService.getMonthlyCategoryExpenseTrend(
       request.user!.sub,
       query.months,
+    );
+  }
+
+  @Get('monthly-expenses/by-tags')
+  @ApiOperation({
+    summary: 'Get recent monthly expense totals by selected tags',
+    description:
+      'Returns one monthly series per selected user-owned tag for the last 5, 8, or 12 UTC months. An expense contributes to every selected tag attached to it.',
+  })
+  @ApiOkResponse({
+    description: 'Monthly tag expense trends returned successfully.',
+    type: MonthlyTagExpenseTrendResponseDto,
+  })
+  getMonthlyTagExpenseTrend(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MonthlyTagExpenseTrendQueryDto,
+  ) {
+    return this.reportService.getMonthlyTagExpenseTrend(
+      request.user!.sub,
+      query.months,
+      query.tagIds,
     );
   }
 
