@@ -55,9 +55,9 @@ export class ExpenseController {
 
   @Get()
   @ApiOperation({
-    summary: 'List expenses for calendar month',
+    summary: 'List expenses by calendar month or global note search',
     description:
-      'Defaults to the current UTC calendar month. Results never mix expenses from different months.',
+      'Defaults to the current UTC calendar month. Supplying note searches only expense notes across all months while preserving pagination and newest-first ordering.',
   })
   @ApiOkResponse({
     description: 'Paginated expenses returned successfully.',

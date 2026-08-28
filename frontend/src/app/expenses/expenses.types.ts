@@ -30,6 +30,7 @@ export interface ListExpensesResponse {
   monthKey: string;
   startDate: string;
   endDate: string;
+  noteSearch?: string;
   page: number;
   limit: number;
   total: number;

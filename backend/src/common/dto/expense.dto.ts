@@ -77,6 +77,19 @@ export class ListExpensesQueryDto {
   month?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Case-insensitive note text to search across all expense months. When present, the month filter is ignored.',
+    example: 'office lunch',
+    maxLength: 100,
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(safeTextPattern, { message: 'note search cannot contain angle brackets' })
+  note?: string;
+
+  @ApiPropertyOptional({
     example: 10,
     minimum: 1,
     maximum: 50,
@@ -189,6 +202,12 @@ export class ListExpensesResponseDto {
 
   @ApiProperty({ example: '2026-05-31' })
   endDate: string;
+
+  @ApiPropertyOptional({
+    description: 'Normalized global note search applied to this result.',
+    example: 'office lunch',
+  })
+  noteSearch?: string;
 
   @ApiProperty({ example: 1 })
   page: number;

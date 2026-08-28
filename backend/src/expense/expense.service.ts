@@ -117,7 +117,8 @@ export class ExpenseService {
     query: ListExpensesQueryDto,
     ownerUserId: string,
   ): Promise<ListExpensesResponseDto> {
-    const monthRange = this.resolveMonthRange(query.month);
+    const noteSearch = query.note?.trim();
+    const monthRange = this.resolveMonthRange(noteSearch ? undefined : query.month);
     const limit = query.limit ?? 10;
     const page = query.page ?? 1;
     const skip = (page - 1) * limit;
@@ -125,8 +126,9 @@ export class ExpenseService {
     try {
       const filter = await this.buildExpenseLedgerFilter(
         ownerUserId,
-        monthRange.start,
-        monthRange.end,
+        noteSearch ? undefined : monthRange.start,
+        noteSearch ? undefined : monthRange.end,
+        noteSearch,
       );
       const [expenses, total] = await Promise.all([
         this.expenseModel
@@ -142,6 +144,7 @@ export class ExpenseService {
         monthKey: monthRange.monthKey,
         startDate: monthRange.startDate,
         endDate: monthRange.endDate,
+        noteSearch,
         page,
         limit,
         total,
@@ -151,6 +154,7 @@ export class ExpenseService {
     } catch (error) {
       this.logger.error(error, 'Expense list failed', {
         ownerUserId,
+        hasNoteSearch: Boolean(noteSearch),
         monthKey: monthRange.monthKey,
         page,
       });
@@ -336,8 +340,9 @@ export class ExpenseService {
 
   private async buildExpenseLedgerFilter(
     ownerUserId: string,
-    start: Date,
-    end: Date,
+    start?: Date,
+    end?: Date,
+    noteSearch?: string,
   ): Promise<QueryFilter<Expense>> {
     const emiCategories = await this.categoryModel
       .find({ normalizedName: ExpenseCategoryKey.Emis })
@@ -345,8 +350,18 @@ export class ExpenseService {
       .exec();
     const filter: QueryFilter<Expense> = {
       ownerUserId,
-      spentAt: { $gte: start, $lt: end },
     };
+
+    if (start && end) {
+      filter.spentAt = { $gte: start, $lt: end };
+    }
+
+    if (noteSearch) {
+      filter.note = {
+        $options: 'i',
+        $regex: this.escapeRegex(noteSearch),
+      };
+    }
 
     if (emiCategories.length) {
       // Linked installments belong in the monthly ledger; ungrouped legacy EMIs do not.
@@ -526,6 +541,10 @@ export class ExpenseService {
 
   private toMonthKey(year: number, month: number): string {
     return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private uniqueIds(ids: string[]): string[] {

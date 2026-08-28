@@ -181,6 +181,8 @@ function getExpenseForm(expense: ExpenseItem): ExpenseFormState {
 
 function ExpensesPage() {
   const [selectedMonthKey, setSelectedMonthKey] = useState(getCurrentMonthKey);
+  const [noteSearchInput, setNoteSearchInput] = useState('');
+  const [noteSearchQuery, setNoteSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [expensesData, setExpensesData] =
@@ -224,6 +226,7 @@ function ExpensesPage() {
   const total = expensesData?.total ?? 0;
   const visibleStart = total ? (page - 1) * limit + 1 : 0;
   const visibleEnd = total ? Math.min(page * limit, total) : 0;
+  const isNoteSearchActive = Boolean(noteSearchQuery);
   const selectedTags = useMemo(
     () => tags.filter((tag) => expenseForm.tagIds.includes(tag.id)),
     [expenseForm.tagIds, tags],
@@ -245,6 +248,23 @@ function ExpensesPage() {
   }, [expenseForm.tagSearch, tags]);
 
   useEffect(() => {
+    const normalizedSearch = noteSearchInput.trim();
+
+    if (normalizedSearch === noteSearchQuery) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setNoteSearchQuery(normalizedSearch);
+      setPage(1);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [noteSearchInput, noteSearchQuery]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     void loadExpenses(controller.signal);
@@ -252,7 +272,7 @@ function ExpensesPage() {
     return () => {
       controller.abort();
     };
-  }, [selectedMonthKey, page, limit]);
+  }, [selectedMonthKey, noteSearchQuery, page, limit]);
 
   async function loadExpenses(signal?: AbortSignal) {
     setIsLoading(true);
@@ -261,9 +281,14 @@ function ExpensesPage() {
     try {
       const query = new URLSearchParams({
         limit: String(limit),
-        month: selectedMonthKey,
         page: String(page),
       });
+
+      if (noteSearchQuery) {
+        query.set('note', noteSearchQuery);
+      } else {
+        query.set('month', selectedMonthKey);
+      }
       const data = await fetchApi<ListExpensesResponse>(
         `/expenses?${query.toString()}`,
         signal,
@@ -346,6 +371,28 @@ function ExpensesPage() {
   function updateLimit(nextLimit: number) {
     setLimit(nextLimit);
     setPage(1);
+  }
+
+  function applyNoteSearch() {
+    setNoteSearchQuery(noteSearchInput.trim());
+    setPage(1);
+  }
+
+  function clearNoteSearch() {
+    setNoteSearchInput('');
+    setNoteSearchQuery('');
+    setPage(1);
+  }
+
+  function refreshExpenses() {
+    const normalizedSearch = noteSearchInput.trim();
+
+    if (normalizedSearch !== noteSearchQuery) {
+      applyNoteSearch();
+      return;
+    }
+
+    void loadExpenses();
   }
 
   function openCreateModal() {
@@ -516,7 +563,13 @@ function ExpensesPage() {
       setEditingExpense(null);
       setExpenseForm(getEmptyExpenseForm(savedExpense.monthKey));
 
-      if (savedExpense.monthKey !== selectedMonthKey || page !== 1) {
+      if (noteSearchQuery) {
+        if (page !== 1) {
+          setPage(1);
+        } else {
+          void loadExpenses();
+        }
+      } else if (savedExpense.monthKey !== selectedMonthKey || page !== 1) {
         setSelectedMonthKey(savedExpense.monthKey);
         setPage(1);
       } else {
@@ -585,21 +638,34 @@ function ExpensesPage() {
 
   return (
     <section className="space-y-7">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase text-[#f36f4e]">
-            SpendWise
-          </p>
-          <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">
-            Expenses
-          </h2>
+      <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
+        <div className="flex items-end justify-between gap-4 xl:block">
+          <div>
+            <p className="text-sm font-semibold uppercase text-[#f36f4e]">
+              SpendWise
+            </p>
+            <h2 className="mt-3 text-4xl font-bold text-zinc-950 sm:text-5xl">
+              Expenses
+            </h2>
+          </div>
+
+          <button
+            aria-label="Add expense"
+            className="grid size-11 shrink-0 place-items-center rounded-md bg-[#f36f4e] text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42] xl:hidden"
+            onClick={openCreateModal}
+            title="Add expense"
+            type="button"
+          >
+            <Plus size={19} />
+          </button>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <label className="flex items-center gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-lg shadow-[#dfb49f]/10">
+        <div className="grid w-full grid-cols-2 gap-2 xl:flex xl:items-center xl:justify-end 2xl:w-auto">
+          <label className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-lg shadow-[#dfb49f]/10">
             <span className="text-xs uppercase text-zinc-400">Month</span>
             <select
-              className="bg-transparent text-sm font-bold text-zinc-900 outline-none"
+              className="min-w-0 bg-transparent text-sm font-bold text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isNoteSearchActive}
               onChange={(event) => updateMonth(selectedYear, event.target.value)}
               value={selectedMonth}
             >
@@ -611,10 +677,11 @@ function ExpensesPage() {
             </select>
           </label>
 
-          <label className="flex items-center gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-lg shadow-[#dfb49f]/10">
+          <label className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-lg shadow-[#dfb49f]/10">
             <span className="text-xs uppercase text-zinc-400">Year</span>
             <select
-              className="bg-transparent text-sm font-bold text-zinc-900 outline-none"
+              className="min-w-0 bg-transparent text-sm font-bold text-zinc-900 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isNoteSearchActive}
               onChange={(event) =>
                 updateMonth(Number(event.target.value), selectedMonth)
               }
@@ -628,18 +695,59 @@ function ExpensesPage() {
             </select>
           </label>
 
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-[#eadfd5] bg-white px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isLoading}
-            onClick={() => loadExpenses()}
-            type="button"
-          >
-            <RefreshCcw className={isLoading ? 'animate-spin' : ''} size={16} />
-            Refresh
-          </button>
+          <div className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-2 xl:col-span-1 xl:w-[320px] 2xl:w-[360px]">
+            <label className="relative block min-w-0">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                size={16}
+              />
+              <input
+                aria-label="Search expense notes"
+                className="h-11 w-full rounded-md border border-[#eadfd5] bg-white pl-10 pr-10 text-sm font-medium text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#f36f4e] focus:ring-2 focus:ring-[#f36f4e]/10"
+                inputMode="search"
+                maxLength={100}
+                onChange={(event) => setNoteSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyNoteSearch();
+                  }
+                }}
+                placeholder="Search notes across all months"
+                type="text"
+                value={noteSearchInput}
+              />
+              {noteSearchInput ? (
+                <button
+                  aria-label="Clear note search"
+                  className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+                  onClick={clearNoteSearch}
+                  title="Clear note search"
+                  type="button"
+                >
+                  <X size={15} />
+                </button>
+              ) : null}
+            </label>
+
+            <button
+              aria-label="Refresh expenses"
+              className="grid size-11 place-items-center rounded-md border border-[#eadfd5] bg-white text-zinc-600 transition hover:border-[#f36f4e]/40 hover:text-[#f36f4e] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isLoading}
+              onClick={refreshExpenses}
+              title="Refresh expenses"
+              type="button"
+            >
+              <RefreshCcw
+                className={isLoading ? 'animate-spin' : ''}
+                size={16}
+              />
+            </button>
+          </div>
 
           <button
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#f36f4e] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42]"
+            className="hidden h-11 items-center justify-center gap-2 rounded-md bg-[#f36f4e] px-4 text-sm font-bold text-white shadow-lg shadow-[#f36f4e]/20 transition hover:bg-[#dc5f42] xl:inline-flex"
             onClick={openCreateModal}
             type="button"
           >
@@ -650,8 +758,20 @@ function ExpensesPage() {
       </div>
 
       <div className="rounded-lg border border-[#eadfd5] bg-[#f7efe8] px-4 py-3 text-sm leading-6 text-zinc-600">
-        Showing expenses only for {getMonthLabel(selectedMonthKey)}. Change the
-        month or year to edit older entries.
+        {isNoteSearchActive ? (
+          <>
+            Searching expense notes across all months for{' '}
+            <strong className="font-bold text-zinc-800">
+              &quot;{noteSearchQuery}&quot;
+            </strong>
+            . Clear the search to return to {getMonthLabel(selectedMonthKey)}.
+          </>
+        ) : (
+          <>
+            Showing expenses only for {getMonthLabel(selectedMonthKey)}. Change
+            the month or year to edit older entries.
+          </>
+        )}
       </div>
 
       <AnimatePresence>
@@ -671,7 +791,9 @@ function ExpensesPage() {
         <div className="flex flex-col gap-3 border-b border-[#eadfd5] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-bold text-zinc-950">
-              {getMonthLabel(selectedMonthKey)}
+              {isNoteSearchActive
+                ? 'Note search results'
+                : getMonthLabel(selectedMonthKey)}
             </h3>
             <p className="mt-1 text-sm text-zinc-500">
               {total} {total === 1 ? 'expense' : 'expenses'}
@@ -827,10 +949,14 @@ function ExpensesPage() {
                       <ReceiptText size={20} />
                     </div>
                     <p className="mt-3 text-sm font-semibold text-zinc-800">
-                      No expenses for {getMonthLabel(selectedMonthKey)}
+                      {isNoteSearchActive
+                        ? `No notes match "${noteSearchQuery}"`
+                        : `No expenses for ${getMonthLabel(selectedMonthKey)}`}
                     </p>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Pick another month or add an expense here.
+                      {isNoteSearchActive
+                        ? 'Try a different note or clear the search.'
+                        : 'Pick another month or add an expense here.'}
                     </p>
                   </td>
                 </tr>
